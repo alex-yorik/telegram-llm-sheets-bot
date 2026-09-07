@@ -1,0 +1,16 @@
+services:
+  bot:
+    build: .
+    container_name: telegram-llm-sheets-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./credentials:/app/credentials:ro
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'python main.py' || exit 1"]
+      interval: 300s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
