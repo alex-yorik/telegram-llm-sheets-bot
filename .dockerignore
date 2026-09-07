@@ -1,0 +1,11 @@
+.git
+.env
+.env.example
+credentials/*.json
+data/
+__pycache__/
+*.pyc
+README.md
+.gitignore
+.dockerignore
+scripts/

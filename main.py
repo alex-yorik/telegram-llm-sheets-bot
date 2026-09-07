@@ -20,6 +20,8 @@ def setup_logging() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def build_application() -> Application:
@@ -27,7 +29,7 @@ def build_application() -> Application:
     try:
         client = GoogleSheetsClient()
     except SheetsError:
-        logger.exception("Sheets недоступны, бот стартует без записи")
+        logger.exception("Sheets unavailable, bot starts without writing")
         client = None
     handlers.sheets_client = client
     application = (
@@ -50,7 +52,7 @@ async def main() -> None:
     stop_event = asyncio.Event()
 
     def _shutdown(signum: int, _frame: object) -> None:
-        logger.info("Получен сигнал %s, завершаем работу...", signum)
+        logger.info("Received signal %s, shutting down...", signum)
         loop.call_soon_threadsafe(stop_event.set)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -60,14 +62,14 @@ async def main() -> None:
     await application.start()
     assert application.updater is not None
     await application.updater.start_polling()
-    logger.info("Бот запущен (polling).")
+    logger.info("Bot started (polling).")
 
     await stop_event.wait()
 
     await application.updater.stop()
     await application.stop()
     await application.shutdown()
-    logger.info("Бот остановлен.")
+    logger.info("Bot stopped.")
 
 
 if __name__ == "__main__":

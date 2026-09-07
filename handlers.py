@@ -24,7 +24,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
     await update.message.reply_text(
-        "Привет! Отправь мне текстовое сообщение..."
+        "Hi! Send me a text message and I'll save the details to the spreadsheet."
     )
 
 
@@ -34,42 +34,42 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     chat_id = update.effective_chat.id if update.effective_chat else None
     text = update.message.text
-    logger.info("Получено сообщение от chat_id=%s: %s", chat_id, text)
-    logger.info("Вызываю extract_lead для chat_id=%s", chat_id)
+    logger.info("Received message from chat_id=%s: %s", chat_id, text)
+    logger.info("Calling extract_lead for chat_id=%s", chat_id)
     try:
         lead = await extract_lead(text)
     except LLMValidationError:
         await update.message.reply_text(
-            "Не удалось извлечь данные, отправь подробнее"
+            "Could not extract data, please send more details"
         )
         return
     except LLMRequestError:
-        await update.message.reply_text("Ошибка обработки, попробуй позже")
+        await update.message.reply_text("Processing error, try again later")
         return
     except Exception:
-        logger.exception("Ошибка обработки сообщения chat_id=%s", chat_id)
-        await update.message.reply_text("Произошла ошибка")
+        logger.exception("Failed to process message chat_id=%s", chat_id)
+        await update.message.reply_text("An error occurred")
         return
     client = sheets_client or context.bot_data.get("sheets_client")
     saved = False
     if client is None:
-        logger.warning("SheetsClient не инициализирован, пропускаю запись")
+        logger.warning("SheetsClient not initialized, skipping write")
     else:
         try:
             await asyncio.to_thread(client.append_lead, lead, text)
             saved = True
         except SheetsError:
             logger.exception(
-                "Не удалось сохранить лида в таблицу chat_id=%s", chat_id
+                "Failed to save lead to spreadsheet chat_id=%s", chat_id
             )
     answer = (
-        f"Извлечённые данные:\n"
-        f"Имя: {lead.name or '-'}\n"
-        f"Телефон: {lead.phone or '-'}\n"
-        f"Услуга: {lead.service or '-'}\n"
-        f"Дата: {lead.date or '-'}\n"
-        f"Время: {lead.time or '-'}"
+        f"Extracted data:\n"
+        f"Name: {lead.name or '-'}\n"
+        f"Phone: {lead.phone or '-'}\n"
+        f"Service: {lead.service or '-'}\n"
+        f"Date: {lead.date or '-'}\n"
+        f"Time: {lead.time or '-'}"
     )
     if saved:
-        answer += "\n✅ Данные сохранены в таблицу"
+        answer += "\n✅ Data saved to spreadsheet"
     await update.message.reply_text(answer)

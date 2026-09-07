@@ -50,14 +50,14 @@ class GoogleSheetsClient:
             )
             self._client = gspread.authorize(creds)
             logger.info(
-                "GoogleSheetsClient инициализирован: spreadsheet_id=%s "
+                "GoogleSheetsClient initialized: spreadsheet_id=%s "
                 "sheet=%s creds=%s",
                 self._spreadsheet_id,
                 self._sheet_name,
                 self._credentials_path,
             )
         except Exception as exc:
-            logger.exception("Не удалось инициализировать GoogleSheetsClient")
+            logger.exception("Failed to initialize GoogleSheetsClient")
             raise SheetsError(str(exc)) from exc
 
     def _get_worksheet(self) -> gspread.Worksheet:
@@ -68,14 +68,14 @@ class GoogleSheetsClient:
                 return spreadsheet.worksheet(self._sheet_name)
             except gspread.WorksheetNotFound:
                 logger.warning(
-                    "Лист %r не найден, использую первый лист",
+                    "Sheet %r not found, using the first sheet",
                     self._sheet_name,
                 )
                 return spreadsheet.sheet1
         except SheetsError:
             raise
         except Exception as exc:
-            logger.exception("Не удалось открыть таблицу")
+            logger.exception("Failed to open spreadsheet")
             raise SheetsError(str(exc)) from exc
 
     def append_lead(self, lead: Lead, original_message: str) -> None:
@@ -90,7 +90,7 @@ class GoogleSheetsClient:
                 if values:
                     worksheet.clear()
                 worksheet.append_row(HEADER, value_input_option="RAW")
-                logger.info("Добавлен заголовок: %s", HEADER)
+                logger.info("Header row added: %s", HEADER)
             created_at = datetime.datetime.now(
                 datetime.timezone.utc
             ).isoformat()
@@ -104,9 +104,9 @@ class GoogleSheetsClient:
                 created_at,
             ]
             worksheet.append_row(row, value_input_option="RAW")
-            logger.info("Лида сохранён в таблицу: %s", row)
+            logger.info("Lead saved to spreadsheet: %s", row)
         except SheetsError:
             raise
         except Exception as exc:
-            logger.exception("Не удалось сохранить лида в таблицу")
+            logger.exception("Failed to save lead to spreadsheet")
             raise SheetsError(str(exc)) from exc

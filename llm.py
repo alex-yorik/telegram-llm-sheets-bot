@@ -41,13 +41,10 @@ def _strip_code_fences(content: str) -> str:
 
 async def extract_lead(text: str) -> Lead:
     """Извлекает данные заявки из текста через LLM."""
-    api_key = settings.llm_api_key or ""
-    key_preview = (api_key[:10] + "...") if api_key else "<empty>"
     logger.info(
-        "LLM запрос: base_url=%s model=%s api_key=%s text=%.100s",
+        "LLM request: base_url=%s model=%s text=%.100s",
         settings.llm_api_base,
         settings.llm_model,
-        key_preview,
         text,
     )
     client = AsyncOpenAI(
@@ -63,20 +60,20 @@ async def extract_lead(text: str) -> Lead:
                 {"role": "user", "content": text},
             ],
         )
-        logger.info("LLM ответ получен: %s", response)
+        logger.info("LLM response received: %s", response)
     except OpenAIError as exc:
-        logger.exception("Ошибка запроса к LLM")
+        logger.exception("LLM request failed")
         raise LLMRequestError(str(exc)) from exc
     except Exception as exc:
-        logger.exception("Неожиданная ошибка запроса к LLM")
+        logger.exception("Unexpected error during LLM request")
         raise LLMRequestError(str(exc)) from exc
 
     try:
         content = (response.choices[0].message.content or "").strip()
-        logger.info("LLM сырой контент: %s", content)
+        logger.info("LLM raw content: %s", content)
         cleaned = _strip_code_fences(content)
         data = json.loads(cleaned)
         return Lead.model_validate(data)
     except (json.JSONDecodeError, ValidationError, IndexError) as exc:
-        logger.exception("Ошибка валидации ответа LLM")
+        logger.exception("Failed to validate LLM response")
         raise LLMValidationError(str(exc)) from exc
