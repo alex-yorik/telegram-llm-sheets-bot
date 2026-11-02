@@ -6,9 +6,9 @@ import signal
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-from config import settings
 import handlers
-from handlers import handle_text, start
+from config import settings
+from handlers import handle_text, handle_unsupported, start
 from sheets import GoogleSheetsClient, SheetsError
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,24 @@ def build_application() -> Application:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
+    )
+    application.add_handler(
+        MessageHandler(
+            filters.PHOTO
+            | filters.AUDIO
+            | filters.VOICE
+            | filters.VIDEO
+            | filters.Document.ALL
+            | filters.Sticker.ALL
+            | filters.ANIMATION
+            | filters.VIDEO_NOTE
+            | filters.CONTACT
+            | filters.LOCATION
+            | filters.VENUE
+            | filters.POLL
+            | filters.Dice.ALL,
+            handle_unsupported,
+        )
     )
     return application
 
