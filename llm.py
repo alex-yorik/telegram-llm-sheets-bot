@@ -42,10 +42,10 @@ def _strip_code_fences(content: str) -> str:
 async def extract_lead(text: str) -> Lead:
     """Извлекает данные заявки из текста через LLM."""
     logger.info(
-        "LLM request: base_url=%s model=%s text=%.100s",
+        "LLM request sent (base_url=%s, model=%s, length=%s)",
         settings.llm_api_base,
         settings.llm_model,
-        text,
+        len(text),
     )
     client = AsyncOpenAI(
         api_key=settings.llm_api_key,
@@ -60,7 +60,7 @@ async def extract_lead(text: str) -> Lead:
                 {"role": "user", "content": text},
             ],
         )
-        logger.info("LLM response received: %s", response)
+        logger.info("LLM response received")
     except OpenAIError as exc:
         logger.exception("LLM request failed")
         raise LLMRequestError(str(exc)) from exc
@@ -70,7 +70,6 @@ async def extract_lead(text: str) -> Lead:
 
     try:
         content = (response.choices[0].message.content or "").strip()
-        logger.info("LLM raw content: %s", content)
         cleaned = _strip_code_fences(content)
         data = json.loads(cleaned)
         return Lead.model_validate(data)

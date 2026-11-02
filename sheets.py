@@ -78,7 +78,12 @@ class GoogleSheetsClient:
             logger.exception("Failed to open spreadsheet")
             raise SheetsError(str(exc)) from exc
 
-    def append_lead(self, lead: Lead, original_message: str) -> None:
+    def append_lead(
+        self,
+        lead: Lead,
+        original_message: str,
+        chat_id: int | None = None,
+    ) -> None:
         """Добавляет строку с данными заявки в таблицу."""
         try:
             worksheet = self._get_worksheet()
@@ -104,7 +109,7 @@ class GoogleSheetsClient:
                 created_at,
             ]
             worksheet.append_row(row, value_input_option="RAW")
-            logger.info("Lead saved to spreadsheet: %s", row)
+            logger.info("Lead saved to spreadsheet (chat_id=%s)", chat_id)
         except SheetsError:
             raise
         except Exception as exc:

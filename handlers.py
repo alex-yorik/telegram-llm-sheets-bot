@@ -24,7 +24,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message is None:
         return
     await update.message.reply_text(
-        "Hi! Send me a text message and I'll save the details to the spreadsheet."
+        "Hi! Send me a text message and I'll save the details to the spreadsheet.\n\n"
+        "Note: Your messages are processed by an external LLM API and extracted "
+        "data may be saved to Google Sheets."
     )
 
 
@@ -34,7 +36,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     chat_id = update.effective_chat.id if update.effective_chat else None
     text = update.message.text
-    logger.info("Received message from chat_id=%s: %s", chat_id, text)
+    logger.info("Received message from chat_id=%s, length=%s", chat_id, len(text))
     logger.info("Calling extract_lead for chat_id=%s", chat_id)
     try:
         lead = await extract_lead(text)
@@ -56,7 +58,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         logger.warning("SheetsClient not initialized, skipping write")
     else:
         try:
-            await asyncio.to_thread(client.append_lead, lead, text)
+            await asyncio.to_thread(client.append_lead, lead, text, chat_id)
             saved = True
         except SheetsError:
             logger.exception(
