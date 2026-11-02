@@ -5,7 +5,7 @@
 - **Base branch:** `main`
 - **Verified code commit:** `c80ddec` (audit report commit; code is `8c7b96a`)
 - **Pull request:** https://github.com/alex-yorik/telegram-llm-sheets-bot/pull/1
-- **CI status:** PASS on `c80ddec` (CI + Quality Gates, all jobs green)
+- **CI status:** PASS on `c80ddec` and `c95bf0d` (CI + Quality Gates, all jobs green)
 - **Project level:** D (Demo / Portfolio) per `QUALITY_STANDARD.md` v2.1
 - **Author position:** AI-assisted self-review, not an independent third-party audit.
 
@@ -148,8 +148,9 @@ real sheet layout, rate limits, or end-to-end latency.
   and `.github/workflows/ci.yml`.
 - No source code changes were made in this publication/report step.
 - No merge, force-push, rebase, or history rewrite.
-- GitHub Actions on `c80ddec`: CI (`test`, `lint`, `docker-build`) and Quality
-  Gates (`secrets-scan`, `bandit`, `coverage-gate`, `modularity`) all passed.
+- GitHub Actions on `c80ddec` and `c95bf0d`: CI (`test`, `lint`,
+  `docker-build`) and Quality Gates (`secrets-scan`, `bandit`,
+  `coverage-gate`, `modularity`) all passed.
 - `gitleaks-action` ran successfully in GitHub (no license failure).
 
 ### NOT VERIFIED
@@ -172,9 +173,8 @@ real sheet layout, rate limits, or end-to-end latency.
    `restart: unless-stopped` only handles process exit.
 4. **Single requirements file** increases the image surface and does not follow
    `DEP-01`; acceptable for Level D.
-5. **CI passed for `c80ddec`.** This report is a later docs-only commit, so a
-   final re-run is expected on the PR head. Do not merge until that run is
-   green.
+5. **CI passed for `c80ddec` and `c95bf0d`.** The final status-line edit is a
+   docs-only commit; check the PR head run before merging.
 6. **In-memory deduplication and no retry/queue** can lose or duplicate a lead
    on restart or transient Google API failure (see `TECH_DEBT.md`).
 
