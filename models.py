@@ -13,13 +13,6 @@ class Lead(BaseModel):
     time: str | None = None
 
     def has_data(self) -> bool:
-        """Возвращает True если хотя бы одно поле заполнено."""
-        return any(
-            [
-                self.name,
-                self.phone,
-                self.service,
-                self.date,
-                self.time,
-            ]
-        )
+        """Возвращает True если хотя бы одно поле содержит непробельные данные."""
+        values = (self.name, self.phone, self.service, self.date, self.time)
+        return any(value and value.strip() for value in values)

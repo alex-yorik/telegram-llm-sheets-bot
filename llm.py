@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = (
     "Ты извлекаешь данные заявки из текста пользователя. "
     "Верни ТОЛЬКО валидный JSON без пояснений и без markdown-обёртки. "
-    "Формат: {\"name\": str | null, \"phone\": str | null, "
-    "\"service\": str | null, \"date\": str | null, \"time\": str | null}. "
+    'Формат: {"name": str | null, "phone": str | null, '
+    '"service": str | null, "date": str | null, "time": str | null}. '
     "Если поле не найдено в тексте, укажи null. "
     "Дату и время верни как в тексте, без переформатирования."
 )

@@ -30,20 +30,15 @@ def build_application() -> Application:
         client = GoogleSheetsClient()
     except SheetsError as exc:
         logger.warning(
-            "Google Sheets unavailable at startup: %s. "
-            "Bot will start without write capability.",
+            "Google Sheets unavailable at startup: %s. " "Bot will start without write capability.",
             exc,
         )
         client = None
     handlers.sheets_client = client
-    application = (
-        Application.builder().token(settings.telegram_bot_token).build()
-    )
+    application = Application.builder().token(settings.telegram_bot_token).build()
     application.bot_data["sheets_client"] = client
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
-    )
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(
         MessageHandler(
             filters.PHOTO
@@ -78,6 +73,7 @@ async def main() -> None:
         loop.call_soon_threadsafe(stop_event.set)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
+        # signal.signal accepts signal.Signals at runtime; the stub expects int.
         signal.signal(sig, _shutdown)  # type: ignore[arg-type]
 
     await application.initialize()

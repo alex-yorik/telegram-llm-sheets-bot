@@ -37,21 +37,14 @@ class GoogleSheetsClient:
         spreadsheet_id: str | None = None,
         sheet_name: str | None = None,
     ) -> None:
-        self._credentials_path = (
-            credentials_path or settings.google_application_credentials
-        )
-        self._spreadsheet_id = (
-            spreadsheet_id or settings.google_spreadsheet_id
-        )
+        self._credentials_path = credentials_path or settings.google_application_credentials
+        self._spreadsheet_id = spreadsheet_id or settings.google_spreadsheet_id
         self._sheet_name = sheet_name or settings.google_sheet_name
         try:
-            creds = Credentials.from_service_account_file(
-                self._credentials_path, scopes=_SCOPES
-            )
+            creds = Credentials.from_service_account_file(self._credentials_path, scopes=_SCOPES)
             self._client = gspread.authorize(creds)
             logger.info(
-                "GoogleSheetsClient initialized: spreadsheet_id=%s "
-                "sheet=%s creds=%s",
+                "GoogleSheetsClient initialized: spreadsheet_id=%s " "sheet=%s creds=%s",
                 self._spreadsheet_id,
                 self._sheet_name,
                 self._credentials_path,
@@ -88,17 +81,13 @@ class GoogleSheetsClient:
         try:
             worksheet = self._get_worksheet()
             values = worksheet.get_all_values()
-            is_empty = not values or all(
-                not any(cell.strip() for cell in row) for row in values
-            )
+            is_empty = not values or all(not any(cell.strip() for cell in row) for row in values)
             if is_empty:
                 if values:
                     worksheet.clear()
                 worksheet.append_row(HEADER, value_input_option="RAW")
                 logger.info("Header row added: %s", HEADER)
-            created_at = datetime.datetime.now(
-                datetime.timezone.utc
-            ).isoformat()
+            created_at = datetime.datetime.now(datetime.UTC).isoformat()
             row = [
                 lead.name or "",
                 lead.phone or "",
