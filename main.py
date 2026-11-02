@@ -28,8 +28,12 @@ def build_application() -> Application:
     """Создает и настраивает Application."""
     try:
         client = GoogleSheetsClient()
-    except SheetsError:
-        logger.exception("Sheets unavailable, bot starts without writing")
+    except SheetsError as exc:
+        logger.warning(
+            "Google Sheets unavailable at startup: %s. "
+            "Bot will start without write capability.",
+            exc,
+        )
         client = None
     handlers.sheets_client = client
     application = (
@@ -70,7 +74,7 @@ async def main() -> None:
     stop_event = asyncio.Event()
 
     def _shutdown(signum: int, _frame: object) -> None:
-        logger.info("Received signal %s, shutting down...", signum)
+        logger.info("Received shutdown signal %s, shutting down...", signum)
         loop.call_soon_threadsafe(stop_event.set)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
