@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections import deque
 from typing import TYPE_CHECKING
 
 from telegram import Update
@@ -23,7 +24,8 @@ MAX_PROCESSED_MESSAGES = 1000
 sheets_client: "GoogleSheetsClient | None" = None
 
 # Ключ (chat_id, message_id): message_id уникален только внутри чата.
-processed_messages: set[tuple[int | None, int]] = set()
+# deque(maxlen=N) хранит только последние N записей и сам вытесняет старейшие.
+processed_messages: deque[tuple[int | None, int]] = deque(maxlen=MAX_PROCESSED_MESSAGES)
 
 
 async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -44,20 +46,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-def _mark_seen(chat_id: int | None, message_id: int) -> bool:
-    """Регистрирует message_id и возвращает False для дубля."""
-    message_key = (chat_id, message_id)
-    if message_key in processed_messages:
+def _is_duplicate(chat_id: int | None, message_id: int) -> bool:
+    """Проверяет, обрабатывалось ли сообщение ранее."""
+    if (chat_id, message_id) in processed_messages:
         logger.info(
             "Duplicate message_id=%s from chat_id=%s, skipping",
             message_id,
             chat_id,
         )
-        return False
-    processed_messages.add(message_key)
-    if len(processed_messages) > MAX_PROCESSED_MESSAGES:
-        processed_messages.clear()
-    return True
+        return True
+    return False
+
+
+def _mark_seen(chat_id: int | None, message_id: int) -> None:
+    """Регистрирует успешно обработанное сообщение (FIFO-вытеснение)."""
+    processed_messages.append((chat_id, message_id))
 
 
 async def _reject_long_message(update: Update, text: str, chat_id: int | None) -> bool:
@@ -144,7 +147,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     text = update.message.text
     message_id = update.message.message_id
 
-    if not _mark_seen(chat_id, message_id):
+    if _is_duplicate(chat_id, message_id):
         return
     if await _reject_long_message(update, text, chat_id):
         return
@@ -154,4 +157,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     saved = await _save_lead(lead, text, chat_id, context)
+    if saved:
+        _mark_seen(chat_id, message_id)
     await update.message.reply_text(_format_answer(lead, saved))
