@@ -14,13 +14,18 @@ production system and is not intended for processing real personal data without
 an additional security and legal review. All example data in this README is
 fictional.
 
-## How this project was built
+## Development approach
 
-This project was developed using AI-assisted coding tools. I define the product
-requirements, establish acceptance criteria, guide the development process,
-validate functionality, review the implementation, and make the final technical
-decisions. AI-assisted reviews are used throughout development. They should not
-be considered independent third-party audits.
+This project was developed under the direction of its owner, who acted as the
+project lead and AI development orchestrator. The owner defined the requirements,
+system constraints, architecture-level decisions, task breakdown, and acceptance
+criteria; coordinated AI coding agents; reviewed their output; and directed
+testing, security checks, and quality improvements.
+
+AI agents assisted with code implementation, analysis, and testing under human
+direction. The owner remained responsible for technical decisions, validation,
+and final acceptance of the delivered work. AI-assisted reviews are part of the
+development process and should not be considered independent third-party audits.
 
 ## What the bot does
 
