@@ -6,8 +6,8 @@ gspread==6.0.0
 google-auth==2.25.0
 
 # Development and CI tools (Phase 5)
-pytest==7.4.3
+pytest==9.0.3
 pytest-cov==4.1.0
-pytest-asyncio==0.23.2
+pytest-asyncio==1.4.1.post1
 ruff==0.1.6
 bandit==1.7.6
