@@ -3,10 +3,18 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 import handlers
 import main
 from sheets import SheetsError
+
+REQUIRED_ENV = (
+    "TELEGRAM_BOT_TOKEN",
+    "LLM_API_KEY",
+    "GOOGLE_SPREADSHEET_ID",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+)
 
 
 def make_builder():
@@ -17,41 +25,42 @@ def make_builder():
     return application, builder
 
 
-def test_setup_logging():
+def test_setup_logging(test_settings):
     """Логирование настраивается один раз и глушит httpx."""
     with (
         patch("main.logging.basicConfig") as basic_config,
         patch("main.logging.getLogger") as get_logger,
     ):
-        main.setup_logging()
+        main.setup_logging(test_settings)
 
     basic_config.assert_called_once()
     assert get_logger.call_count == 2
 
 
-def test_build_application_registers_handlers():
+def test_build_application_registers_handlers(test_settings):
     """Приложение получает три обработчика и клиент Sheets."""
     application, builder = make_builder()
     with (
         patch("main.GoogleSheetsClient") as sheets_class,
         patch("main.Application.builder", return_value=builder),
     ):
-        result = main.build_application()
+        result = main.build_application(test_settings)
 
     assert result is application
     assert application.add_handler.call_count == 3
     assert handlers.sheets_client is sheets_class.return_value
     application.bot_data.__setitem__.assert_any_call("sheets_client", sheets_class.return_value)
+    application.bot_data.__setitem__.assert_any_call("settings", test_settings)
 
 
-def test_build_application_without_sheets():
+def test_build_application_without_sheets(test_settings):
     """При недоступном Sheets бот стартует без записи."""
     application, builder = make_builder()
     with (
         patch("main.GoogleSheetsClient", side_effect=SheetsError("no credentials")),
         patch("main.Application.builder", return_value=builder),
     ):
-        result = main.build_application()
+        result = main.build_application(test_settings)
 
     assert result is application
     assert handlers.sheets_client is None
@@ -59,7 +68,18 @@ def test_build_application_without_sheets():
 
 
 @pytest.mark.asyncio
-async def test_main_starts_and_stops():
+async def test_main_fails_without_required_config(monkeypatch, tmp_path):
+    """Запуск останавливается, если обязательные переменные не заданы."""
+    monkeypatch.chdir(tmp_path)
+    for name in REQUIRED_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+    with pytest.raises(ValidationError):
+        await main.main()
+
+
+@pytest.mark.asyncio
+async def test_main_starts_and_stops(test_settings):
     """main() запускает polling и корректно завершается."""
     application = MagicMock()
     application.initialize = AsyncMock()
@@ -74,6 +94,7 @@ async def test_main_starts_and_stops():
     stop_event.wait = AsyncMock()
 
     with (
+        patch("main.load_settings", return_value=test_settings),
         patch("main.setup_logging"),
         patch("main.build_application", return_value=application),
         patch("main.asyncio.get_running_loop", return_value=loop),

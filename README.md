@@ -14,13 +14,18 @@ production system and is not intended for processing real personal data without
 an additional security and legal review. All example data in this README is
 fictional.
 
-## How this project was built
+## Development approach
 
-This project was developed using AI-assisted coding tools. I define the product
-requirements, establish acceptance criteria, guide the development process,
-validate functionality, review the implementation, and make the final technical
-decisions. AI-assisted reviews are used throughout development. They should not
-be considered independent third-party audits.
+This project was developed under the direction of its owner, who acted as the
+project lead and AI development orchestrator. The owner defined the requirements,
+system constraints, architecture-level decisions, task breakdown, and acceptance
+criteria; coordinated AI coding agents; reviewed their output; and directed
+testing, security checks, and quality improvements.
+
+AI agents assisted with code implementation, analysis, and testing under human
+direction. The owner remained responsible for technical decisions, validation,
+and final acceptance of the delivered work. AI-assisted reviews are part of the
+development process and should not be considered independent third-party audits.
 
 ## What the bot does
 
@@ -90,6 +95,8 @@ Telegram user
 1. Sign up at [openrouter.ai](https://openrouter.ai).
 2. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys).
 3. Use it as `LLM_API_KEY`. Free models work without billing.
+4. If you use OpenRouter, also set `LLM_API_BASE=https://openrouter.ai/api/v1`
+   and `LLM_MODEL` to a model ID from the OpenRouter catalog.
 
 ### 3. Set up Google Sheets
 
@@ -176,9 +183,12 @@ docker compose down && docker compose up -d --build
 Expected startup lines (values depend on your configuration):
 
 ```text
-sheets - INFO - GoogleSheetsClient initialized: spreadsheet_id=... sheet=Sheet1 creds=...
+sheets - INFO - GoogleSheetsClient initialized (sheet=Sheet1)
 __main__ - INFO - Bot started (polling).
 ```
+
+Logs never include the spreadsheet ID, the service account file path, API keys,
+Telegram `chat_id`/`user_id`, or message content.
 
 ## Environment variables
 
@@ -232,13 +242,13 @@ formula injection. `Created At` is a UTC ISO-8601 timestamp.
 
 | Situation | What the user sees | What happens internally |
 |---|---|---|
-| Message longer than 2000 characters | `Message is too long (max 2000 characters). Please send a shorter message.` | Warning logged with `chat_id` and length; no LLM call, no sheet write. |
-| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged. |
+| Message longer than 2000 characters | `Message is too long (max 2000 characters). Please send a shorter message.` | Warning logged with `correlation_id` and length; no LLM call, no sheet write. |
+| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged with `correlation_id` and `message_id` (`chat_id` is not logged). |
 | LLM returns invalid JSON or fails validation | `Could not extract data. Please send a message with more details (name, phone, service, etc.).` | Error logged; no sheet write. |
 | LLM network, API, or timeout error | `Processing error, try again later` | Error logged; no sheet write. |
 | LLM returns an empty lead | `Could not extract meaningful data. Please send a message with more details (name, phone, service, etc.).` | Warning logged; no sheet write. |
-| Unexpected error during extraction | `An error occurred` | Exception logged with traceback; no sheet write. |
-| Sheets unavailable at startup | Extracted data without a save confirmation | Bot still starts; write is skipped with a warning. |
+| Unexpected error during extraction | `An error occurred` | Error type logged (no traceback); no sheet write. |
+| Sheets unavailable at startup | Extracted data plus `⚠️ Data extracted but could not be saved to spreadsheet. Please try again later.` | Bot still starts; write is skipped with a warning. |
 | Sheets write fails at message time | Extracted data plus `⚠️ Data extracted but could not be saved to spreadsheet. Please try again later.` | Exception logged; the bot keeps running. |
 | Non-text message | `I only process text messages. Please send me a text description.` | No processing. |
 
@@ -247,15 +257,25 @@ blocked.
 
 ## Testing and CI
 
-The test suite uses `pytest`, `pytest-asyncio`, and `pytest-cov`. Latest
-measured result:
+The test suite uses `pytest`, `pytest-asyncio`, and `pytest-cov`. The measured
+result below is **unit-test coverage**:
 
 ```text
-55 passed, 0 skipped
-TOTAL coverage: 99.30%
+81 passed, 0 skipped
+TOTAL unit-test coverage: 99.33%
 ```
 
-Coverage by module:
+All unit tests isolate every external dependency with mocks: Telegram updates
+are `MagicMock` objects, `llm.AsyncOpenAI` is patched, and `sheets.Credentials`,
+`gspread.authorize`, and worksheets are patched. No real Telegram, LLM, or
+Google Sheets request is made by the test suite.
+
+This means coverage proves application logic, not that the real external APIs
+are reachable or that the configured credentials and permissions are valid.
+Availability, latency, quota limits, provider-side schema changes, and Google
+API errors are outside the scope of this coverage.
+
+Unit-test coverage by module:
 
 | Module | Coverage |
 |---|---|
@@ -271,7 +291,7 @@ Run the checks locally:
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 python -m pytest --cov=. --cov-report=term-missing
 ruff check .
@@ -282,10 +302,27 @@ bandit -c pyproject.toml -r . -ll -q
 CI consists of two GitHub Actions workflows:
 
 - `.github/workflows/ci.yml`: jobs `test`, `lint`, and `docker-build`.
-- `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `bandit`,
-  `coverage-gate`, and `modularity`.
+- `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `pip-audit`,
+  `bandit`, `coverage-gate`, and `modularity`.
 
-The coverage gate fails below 80%. The measured suite is at 99.30%.
+Protection for `main` is enforced by the active GitHub Ruleset `Main`
+(`26415946`), not by classic branch protection. The ruleset requires all 8
+status checks before a merge: `test (3.12)`, `lint`, `docker-build`,
+`modularity`, `coverage-gate`, `secrets-scan`, `bandit`, and `pip-audit`.
+`bandit` and `pip-audit` are therefore blocking checks.
+
+The coverage gate fails below 80%. The measured unit-test suite is at 99.33%.
+The mocked unit tests are a fast, mandatory CI step and stay unchanged.
+
+Real integrations are verified by a **manual** smoke test that uses dedicated
+test credentials. It is deliberately excluded from public CI so that no secrets
+are exposed. See
+[docs/integration-smoke-test.md](docs/integration-smoke-test.md) for
+preparation, step-by-step commands, expected results, and cleanup.
+
+A passing coverage gate does not prove that Telegram, the LLM provider, or
+Google Sheets are currently reachable. If the smoke test was not executed, the
+status of the real integrations is `NOT VERIFIED`.
 
 ## Security and privacy notes
 
@@ -296,15 +333,19 @@ full security notes. Key points:
   `credentials/*.json` are gitignored and excluded from the Docker build context.
 - The service account key is mounted read-only into the container.
 - The container runs as a non-root user (`uid 1000`).
-- Logs record metadata only (`chat_id`, message length, length checks, and
-  outcomes). Message text and extracted personal data are not written to logs.
+- Logs record metadata only (`correlation_id`, message length, processing stage,
+  and outcome). Telegram `chat_id`/`user_id`, message text, extracted personal
+  data, spreadsheet ID, service account file path, and API keys are never written
+  to logs. `correlation_id` is a random per-request UUID and is safe for support
+  diagnostics.
 - Message content is sent to a third-party LLM provider, and extracted data is
   stored in Google Sheets. Do not use this bot with real personal data without
   reviewing provider policies, obtaining user consent, and checking applicable
   privacy law.
 - Google Sheets writes use `value_input_option="RAW"` to prevent formula
   injection.
-- Deduplication is in memory and is lost on restart.
+- Deduplication uses a bounded in-memory deque (last 1000 entries) and is lost
+  on restart.
 - There is no per-user rate limiting and no GDPR/HIPAA compliance out of the
   box.
 
@@ -313,8 +354,8 @@ full security notes. Key points:
 See [TECH_DEBT.md](TECH_DEBT.md) for the full list with severity and rationale.
 The main limitations are:
 
-- Deduplication uses an in-memory set of `(chat_id, message_id)` and resets when
-  the bot restarts.
+- Deduplication uses a bounded in-memory deque of `(chat_id, message_id)` (last
+  1000 entries) and resets when the bot restarts.
 - There is no per-user rate limiting, so a single user can generate unlimited
   LLM API calls.
 - Google Sheets writes have no retry or queue, so transient API failures can
@@ -345,29 +386,32 @@ If this project evolves beyond a demo, the planned work is:
 ├── sheets.py                  # GoogleSheetsClient, header creation, append_lead
 ├── models.py                  # Pydantic Lead model
 ├── config.py                  # pydantic-settings configuration
-├── requirements.txt           # Runtime and development dependencies
+├── requirements.txt           # Runtime dependencies
+├── requirements-dev.txt       # Development, testing, and CI tools
 ├── pyproject.toml             # pytest, coverage, ruff, and bandit configuration
 ├── Dockerfile                 # python:3.12-slim, non-root user, `python main.py`
-├── docker-compose.yml         # bot service, env file, read-only credentials mount
+├── docker-compose.yml         # bot service, env file, read-only credentials mount, data volume
 ├── .env.example               # Environment variable template (placeholders only)
 ├── .dockerignore              # Excludes secrets, tests, docs, and tooling from the image
 ├── .gitignore                 # Excludes secrets, local data, and caches
 ├── .pre-commit-config.yaml    # ruff and bandit hooks
-├── .gitleaksignore            # One documented false-positive fingerprint
+├── .gitleaksignore            # Documented false-positive fingerprints
 ├── SECURITY.md                # Security policy and limitations
 ├── TECH_DEBT.md               # Known limitations and future improvements
 ├── LICENSE                    # All rights reserved
 ├── credentials/
 │   └── .gitkeep
 ├── docs/
-│   └── reports/
-│       └── phase5-report.md   # AI-assisted engineering report for the tests and CI work
+│   ├── integration-smoke-test.md  # Manual smoke test for real external APIs
+│   ├── images/                # README screenshots
+│   └── reports/               # AI-assisted engineering reports (audit, phases, CI, README check)
 └── tests/
     ├── __init__.py
     ├── conftest.py
     ├── test_config.py
     ├── test_handlers.py
     ├── test_llm.py
+    ├── test_logging_privacy.py
     ├── test_main.py
     ├── test_models.py
     └── test_sheets.py

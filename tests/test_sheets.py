@@ -32,6 +32,12 @@ def test_client_initialization():
     assert client._sheet_name == "Sheet1"
 
 
+def test_client_requires_explicit_configuration():
+    """Клиент не подхватывает конфигурацию неявно из глобального объекта."""
+    with pytest.raises(TypeError):
+        GoogleSheetsClient()
+
+
 def test_client_initialization_error():
     """Ошибка загрузки credentials превращается в SheetsError."""
     with (

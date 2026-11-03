@@ -6,7 +6,6 @@ import logging
 import gspread
 from google.oauth2.service_account import Credentials
 
-from config import settings
 from models import Lead
 
 logger = logging.getLogger(__name__)
@@ -33,24 +32,19 @@ class GoogleSheetsClient:
 
     def __init__(
         self,
-        credentials_path: str | None = None,
-        spreadsheet_id: str | None = None,
-        sheet_name: str | None = None,
+        credentials_path: str,
+        spreadsheet_id: str,
+        sheet_name: str = "Sheet1",
     ) -> None:
-        self._credentials_path = credentials_path or settings.google_application_credentials
-        self._spreadsheet_id = spreadsheet_id or settings.google_spreadsheet_id
-        self._sheet_name = sheet_name or settings.google_sheet_name
+        self._credentials_path = credentials_path
+        self._spreadsheet_id = spreadsheet_id
+        self._sheet_name = sheet_name
         try:
             creds = Credentials.from_service_account_file(self._credentials_path, scopes=_SCOPES)
             self._client = gspread.authorize(creds)
-            logger.info(
-                "GoogleSheetsClient initialized: spreadsheet_id=%s sheet=%s creds=%s",
-                self._spreadsheet_id,
-                self._sheet_name,
-                self._credentials_path,
-            )
-        except Exception as exc:
-            logger.exception("Failed to initialize GoogleSheetsClient")
+            logger.info("GoogleSheetsClient initialized (sheet=%s)", self._sheet_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to initialize GoogleSheetsClient (%s)", type(exc).__name__)
             raise SheetsError(str(exc)) from exc
 
     def _get_worksheet(self) -> gspread.Worksheet:
@@ -67,8 +61,8 @@ class GoogleSheetsClient:
                 return spreadsheet.sheet1
         except SheetsError:
             raise
-        except Exception as exc:
-            logger.exception("Failed to open spreadsheet")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to open spreadsheet (%s)", type(exc).__name__)
             raise SheetsError(str(exc)) from exc
 
     def append_lead(
@@ -101,6 +95,6 @@ class GoogleSheetsClient:
             logger.info("Lead saved to spreadsheet (correlation_id=%s)", correlation_id)
         except SheetsError:
             raise
-        except Exception as exc:
-            logger.exception("Failed to save lead to spreadsheet")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Failed to save lead to spreadsheet (%s)", type(exc).__name__)
             raise SheetsError(str(exc)) from exc

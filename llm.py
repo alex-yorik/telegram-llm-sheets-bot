@@ -5,9 +5,10 @@ import logging
 import re
 
 from openai import AsyncOpenAI, OpenAIError
+from openai.types.chat import ChatCompletion
 from pydantic import ValidationError
 
-from config import settings
+from config import Settings, load_settings
 from models import Lead
 
 logger = logging.getLogger(__name__)
@@ -39,8 +40,33 @@ def _strip_code_fences(content: str) -> str:
     return text
 
 
-async def extract_lead(text: str, correlation_id: str | None = None) -> Lead:
+def _parse_lead_response(
+    response: ChatCompletion,
+    correlation_id: str | None,
+) -> Lead:
+    """Validates the LLM response and maps failures to LLMValidationError."""
+    try:
+        content = (response.choices[0].message.content or "").strip()
+        cleaned = _strip_code_fences(content)
+        data = json.loads(cleaned)
+        return Lead.model_validate(data)
+    except (json.JSONDecodeError, ValidationError, IndexError) as exc:
+        logger.error(
+            "Failed to validate LLM response (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
+        raise LLMValidationError(str(exc)) from exc
+
+
+async def extract_lead(
+    text: str,
+    correlation_id: str | None = None,
+    settings: Settings | None = None,
+) -> Lead:
     """Extracts lead data from the text via LLM."""
+    if settings is None:
+        settings = load_settings()
     logger.info(
         "LLM request sent (correlation_id=%s, base_url=%s, model=%s, length=%s)",
         correlation_id,
@@ -63,17 +89,14 @@ async def extract_lead(text: str, correlation_id: str | None = None) -> Lead:
         )
         logger.info("LLM response received (correlation_id=%s)", correlation_id)
     except OpenAIError as exc:
-        logger.exception("LLM request failed (correlation_id=%s)", correlation_id)
+        logger.error("LLM request failed (correlation_id=%s, error=%s)", correlation_id, type(exc).__name__)
         raise LLMRequestError(str(exc)) from exc
-    except Exception as exc:
-        logger.exception("Unexpected error during LLM request (correlation_id=%s)", correlation_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Unexpected error during LLM request (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
         raise LLMRequestError(str(exc)) from exc
 
-    try:
-        content = (response.choices[0].message.content or "").strip()
-        cleaned = _strip_code_fences(content)
-        data = json.loads(cleaned)
-        return Lead.model_validate(data)
-    except (json.JSONDecodeError, ValidationError, IndexError) as exc:
-        logger.exception("Failed to validate LLM response (correlation_id=%s)", correlation_id)
-        raise LLMValidationError(str(exc)) from exc
+    return _parse_lead_response(response, correlation_id)

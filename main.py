@@ -7,14 +7,14 @@ import signal
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 import handlers
-from config import settings
+from config import Settings, load_settings
 from handlers import handle_text, handle_unsupported, start
 from sheets import GoogleSheetsClient, SheetsError
 
 logger = logging.getLogger(__name__)
 
 
-def setup_logging() -> None:
+def setup_logging(settings: Settings) -> None:
     """Sets up basic logging."""
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -24,19 +24,24 @@ def setup_logging() -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-def build_application() -> Application:
+def build_application(settings: Settings) -> Application:
     """Creates and configures the Application."""
     try:
-        client = GoogleSheetsClient()
+        client = GoogleSheetsClient(
+            credentials_path=settings.google_application_credentials,
+            spreadsheet_id=settings.google_spreadsheet_id,
+            sheet_name=settings.google_sheet_name,
+        )
     except SheetsError as exc:
         logger.warning(
-            "Google Sheets unavailable at startup: %s. Bot will start without write capability.",
-            exc,
+            "Google Sheets unavailable at startup (%s). Bot will start without write capability.",
+            type(exc).__name__,
         )
         client = None
     handlers.sheets_client = client
     application = Application.builder().token(settings.telegram_bot_token).build()
     application.bot_data["sheets_client"] = client
+    application.bot_data["settings"] = settings
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(
@@ -62,8 +67,9 @@ def build_application() -> Application:
 
 async def main() -> None:
     """Runs the bot with polling and graceful shutdown."""
-    setup_logging()
-    application = build_application()
+    settings = load_settings()
+    setup_logging(settings)
+    application = build_application(settings)
 
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
