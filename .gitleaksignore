@@ -39,3 +39,13 @@ d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-a
 d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:275
 d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:330
 d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:351
+
+# Same false positives in commit b92a2d8, where the test correlation-id
+# literals were restored to their natural call-argument positions. The
+# matched token is the correlation-id literal passed to a test helper;
+# no credential follows. No secret is present.
+b92a2d8947675ea5d4039ae5f8bf1483012b66d4:tests/test_logging_privacy.py:generic-api-key:187
+b92a2d8947675ea5d4039ae5f8bf1483012b66d4:tests/test_logging_privacy.py:generic-api-key:202
+b92a2d8947675ea5d4039ae5f8bf1483012b66d4:tests/test_logging_privacy.py:generic-api-key:275
+b92a2d8947675ea5d4039ae5f8bf1483012b66d4:tests/test_logging_privacy.py:generic-api-key:330
+b92a2d8947675ea5d4039ae5f8bf1483012b66d4:tests/test_logging_privacy.py:generic-api-key:351
