@@ -1,10 +1,10 @@
-"""Конфигурация приложения через переменные окружения."""
+"""Application configuration via environment variables."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Настройки приложения, загружаемые из .env файла."""
+    """Application settings loaded from a .env file."""
 
     telegram_bot_token: str
     llm_api_key: str

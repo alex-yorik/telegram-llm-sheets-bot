@@ -1,4 +1,4 @@
-"""Интеграция с Google Sheets для сохранения заявок."""
+"""Google Sheets integration for saving leads."""
 
 import datetime
 import logging
@@ -25,11 +25,11 @@ _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 
 class SheetsError(Exception):
-    """Ошибка работы с Google Sheets."""
+    """Google Sheets operation error."""
 
 
 class GoogleSheetsClient:
-    """Клиент для записи заявок в Google Таблицу."""
+    """Client for writing leads to a Google Spreadsheet."""
 
     def __init__(
         self,
@@ -54,7 +54,7 @@ class GoogleSheetsClient:
             raise SheetsError(str(exc)) from exc
 
     def _get_worksheet(self) -> gspread.Worksheet:
-        """Открывает worksheet по имени или возвращает первый лист."""
+        """Opens a worksheet by name or returns the first sheet."""
         try:
             spreadsheet = self._client.open_by_key(self._spreadsheet_id)
             try:
@@ -77,7 +77,7 @@ class GoogleSheetsClient:
         original_message: str,
         correlation_id: str | None = None,
     ) -> None:
-        """Добавляет строку с данными заявки в таблицу."""
+        """Appends a row with lead data to the spreadsheet."""
         try:
             worksheet = self._get_worksheet()
             values = worksheet.get_all_values()

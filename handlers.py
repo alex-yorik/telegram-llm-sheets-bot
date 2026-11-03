@@ -1,4 +1,4 @@
-"""Обработчики команд и сообщений Telegram-бота."""
+"""Telegram bot command and message handlers."""
 
 import asyncio
 import logging
@@ -21,23 +21,23 @@ logger = logging.getLogger(__name__)
 MAX_MESSAGE_LENGTH = 2000
 MAX_PROCESSED_MESSAGES = 1000
 
-# Устанавливается в main.py при старте (дублируется в bot_data).
+# Set in main.py at startup (also duplicated in bot_data).
 sheets_client: "GoogleSheetsClient | None" = None
 
-# Ключ (chat_id, message_id): message_id уникален только внутри чата.
-# deque(maxlen=N) хранит только последние N записей и сам вытесняет старейшие.
+# Key (chat_id, message_id): message_id is unique only within a chat.
+# deque(maxlen=N) keeps only the last N entries and evicts the oldest automatically.
 processed_messages: deque[tuple[int | None, int]] = deque(maxlen=MAX_PROCESSED_MESSAGES)
 
 
 async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Отвечает на сообщения неподдерживаемых типов."""
+    """Responds to messages of unsupported types."""
     if update.message is None:
         return
     await update.message.reply_text("I only process text messages. Please send me a text description.")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обрабатывает команду /start."""
+    """Handles the /start command."""
     if update.message is None:
         return
     await update.message.reply_text(
@@ -48,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def _is_duplicate(chat_id: int | None, message_id: int, correlation_id: str) -> bool:
-    """Проверяет, обрабатывалось ли сообщение ранее."""
+    """Checks whether a message has already been processed."""
     if (chat_id, message_id) in processed_messages:
         logger.info(
             "Duplicate message received (correlation_id=%s, message_id=%s), skipping",
@@ -60,12 +60,12 @@ def _is_duplicate(chat_id: int | None, message_id: int, correlation_id: str) -> 
 
 
 def _mark_seen(chat_id: int | None, message_id: int) -> None:
-    """Регистрирует успешно обработанное сообщение (FIFO-вытеснение)."""
+    """Marks a successfully processed message (FIFO eviction)."""
     processed_messages.append((chat_id, message_id))
 
 
 async def _reject_long_message(update: Update, text: str, correlation_id: str) -> bool:
-    """Отвечает отказом, если текст превышает лимит."""
+    """Replies with a rejection if the text exceeds the limit."""
     if len(text) <= MAX_MESSAGE_LENGTH:
         return False
     await update.message.reply_text(
@@ -76,7 +76,7 @@ async def _reject_long_message(update: Update, text: str, correlation_id: str) -
 
 
 async def _extract_or_reply(update: Update, text: str, correlation_id: str) -> Lead | None:
-    """Извлекает заявку или отвечает пользователю об ошибке."""
+    """Extracts the lead or replies to the user with an error."""
     logger.info("Received message (correlation_id=%s, length=%s)", correlation_id, len(text))
     logger.info("Calling extract_lead (correlation_id=%s)", correlation_id)
     try:
@@ -109,7 +109,7 @@ async def _save_lead(
     correlation_id: str,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> bool:
-    """Сохраняет заявку в Google Sheets, возвращает признак успеха."""
+    """Saves the lead to Google Sheets and returns the success flag."""
     client = sheets_client or context.bot_data.get("sheets_client")
     if client is None:
         logger.warning("SheetsClient not initialized, skipping write (correlation_id=%s)", correlation_id)
@@ -123,7 +123,7 @@ async def _save_lead(
 
 
 def _format_answer(lead: Lead, saved: bool) -> str:
-    """Формирует ответ пользователю с извлеченными данными."""
+    """Builds the user response with the extracted data."""
     answer = (
         f"Extracted data:\n"
         f"Name: {lead.name or '-'}\n"
@@ -140,7 +140,7 @@ def _format_answer(lead: Lead, saved: bool) -> str:
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Извлекает данные заявки из текста через LLM."""
+    """Extracts lead data from the text via LLM."""
     if update.message is None or update.message.text is None:
         return
     chat_id = update.effective_chat.id if update.effective_chat else None
