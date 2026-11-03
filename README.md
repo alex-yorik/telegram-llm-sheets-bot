@@ -42,6 +42,16 @@ independent third-party audits.
 - Runs as a non-root user inside Docker and shuts down gracefully on
   `SIGINT` / `SIGTERM`.
 
+## Demo
+
+![Telegram bot dialog](docs/images/telegram-bot-response.png)
+
+A user sends a free-form message and the bot replies with the extracted fields and a save confirmation.
+
+![Google Sheets result](docs/images/google-sheets-result.png)
+
+The same lead is appended as a new row in Google Sheets.
+
 ## Architecture
 
 ```text
