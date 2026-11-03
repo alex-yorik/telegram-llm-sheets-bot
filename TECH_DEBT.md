@@ -10,7 +10,7 @@ This project is classified as **Level D (Demo / Portfolio)** per QUALITY_STANDAR
 
 ### 1. No persistent deduplication store
 **Severity:** Low
-**Impact:** Deduplication uses an in-memory `set` of message_ids. If the bot restarts, the set is cleared and duplicate processing is possible until the set fills again.
+**Impact:** Deduplication uses a bounded in-memory `deque` of `(chat_id, message_id)` keys (last 1000 entries). If the bot restarts, the deque is cleared, and under sustained load the oldest keys are evicted, so a very old duplicate could be processed again.
 **Why not fixed:** Adding a database (Redis, SQLite) would significantly increase complexity for a demo project.
 **Mitigation:** Documented in README. For production, add a persistent store.
 
@@ -71,10 +71,9 @@ This project is classified as **Level D (Demo / Portfolio)** per QUALITY_STANDAR
 
 ## Refactoring opportunities
 
-1. **config.py**: Move `settings = Settings()` instantiation out of module level to improve testability (currently breaks if env vars are missing).
-2. **handlers.py**: Extract response formatting into a separate module.
-3. **llm.py**: Add structured output support for providers that offer it (e.g., OpenAI function calling).
-4. **sheets.py**: Add batch writes for high-volume scenarios.
+1. **handlers.py**: Extract response formatting into a separate module.
+2. **llm.py**: Add structured output support for providers that offer it (e.g., OpenAI function calling).
+3. **sheets.py**: Add batch writes for high-volume scenarios.
 
 ## Decision log
 

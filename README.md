@@ -95,6 +95,8 @@ Telegram user
 1. Sign up at [openrouter.ai](https://openrouter.ai).
 2. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys).
 3. Use it as `LLM_API_KEY`. Free models work without billing.
+4. If you use OpenRouter, also set `LLM_API_BASE=https://openrouter.ai/api/v1`
+   and `LLM_MODEL` to a model ID from the OpenRouter catalog.
 
 ### 3. Set up Google Sheets
 
@@ -241,12 +243,12 @@ formula injection. `Created At` is a UTC ISO-8601 timestamp.
 | Situation | What the user sees | What happens internally |
 |---|---|---|
 | Message longer than 2000 characters | `Message is too long (max 2000 characters). Please send a shorter message.` | Warning logged with `correlation_id` and length; no LLM call, no sheet write. |
-| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged with `correlation_id` and `message_id` (the dedup key itself is not logged). |
+| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged with `correlation_id` and `message_id` (`chat_id` is not logged). |
 | LLM returns invalid JSON or fails validation | `Could not extract data. Please send a message with more details (name, phone, service, etc.).` | Error logged; no sheet write. |
 | LLM network, API, or timeout error | `Processing error, try again later` | Error logged; no sheet write. |
 | LLM returns an empty lead | `Could not extract meaningful data. Please send a message with more details (name, phone, service, etc.).` | Warning logged; no sheet write. |
-| Unexpected error during extraction | `An error occurred` | Exception logged with traceback; no sheet write. |
-| Sheets unavailable at startup | Extracted data without a save confirmation | Bot still starts; write is skipped with a warning. |
+| Unexpected error during extraction | `An error occurred` | Error type logged (no traceback); no sheet write. |
+| Sheets unavailable at startup | Extracted data plus `⚠️ Data extracted but could not be saved to spreadsheet. Please try again later.` | Bot still starts; write is skipped with a warning. |
 | Sheets write fails at message time | Extracted data plus `⚠️ Data extracted but could not be saved to spreadsheet. Please try again later.` | Exception logged; the bot keeps running. |
 | Non-text message | `I only process text messages. Please send me a text description.` | No processing. |
 
@@ -289,7 +291,7 @@ Run the checks locally:
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 python -m pytest --cov=. --cov-report=term-missing
 ruff check .
@@ -300,8 +302,8 @@ bandit -c pyproject.toml -r . -ll -q
 CI consists of two GitHub Actions workflows:
 
 - `.github/workflows/ci.yml`: jobs `test`, `lint`, and `docker-build`.
-- `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `bandit`,
-  `coverage-gate`, and `modularity`.
+- `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `pip-audit`,
+  `bandit`, `coverage-gate`, and `modularity`.
 
 The coverage gate fails below 80%. The measured unit-test suite is at 99.32%.
 The mocked unit tests are a fast, mandatory CI step and stay unchanged.
@@ -336,7 +338,8 @@ full security notes. Key points:
   privacy law.
 - Google Sheets writes use `value_input_option="RAW"` to prevent formula
   injection.
-- Deduplication is in memory and is lost on restart.
+- Deduplication uses a bounded in-memory deque (last 1000 entries) and is lost
+  on restart.
 - There is no per-user rate limiting and no GDPR/HIPAA compliance out of the
   box.
 
@@ -345,8 +348,8 @@ full security notes. Key points:
 See [TECH_DEBT.md](TECH_DEBT.md) for the full list with severity and rationale.
 The main limitations are:
 
-- Deduplication uses an in-memory set of `(chat_id, message_id)` and resets when
-  the bot restarts.
+- Deduplication uses a bounded in-memory deque of `(chat_id, message_id)` (last
+  1000 entries) and resets when the bot restarts.
 - There is no per-user rate limiting, so a single user can generate unlimited
   LLM API calls.
 - Google Sheets writes have no retry or queue, so transient API failures can
@@ -377,15 +380,16 @@ If this project evolves beyond a demo, the planned work is:
 ├── sheets.py                  # GoogleSheetsClient, header creation, append_lead
 ├── models.py                  # Pydantic Lead model
 ├── config.py                  # pydantic-settings configuration
-├── requirements.txt           # Runtime and development dependencies
+├── requirements.txt           # Runtime dependencies
+├── requirements-dev.txt       # Development, testing, and CI tools
 ├── pyproject.toml             # pytest, coverage, ruff, and bandit configuration
 ├── Dockerfile                 # python:3.12-slim, non-root user, `python main.py`
-├── docker-compose.yml         # bot service, env file, read-only credentials mount
+├── docker-compose.yml         # bot service, env file, read-only credentials mount, data volume
 ├── .env.example               # Environment variable template (placeholders only)
 ├── .dockerignore              # Excludes secrets, tests, docs, and tooling from the image
 ├── .gitignore                 # Excludes secrets, local data, and caches
 ├── .pre-commit-config.yaml    # ruff and bandit hooks
-├── .gitleaksignore            # One documented false-positive fingerprint
+├── .gitleaksignore            # Documented false-positive fingerprints
 ├── SECURITY.md                # Security policy and limitations
 ├── TECH_DEBT.md               # Known limitations and future improvements
 ├── LICENSE                    # All rights reserved
@@ -393,8 +397,8 @@ If this project evolves beyond a demo, the planned work is:
 │   └── .gitkeep
 ├── docs/
 │   ├── integration-smoke-test.md  # Manual smoke test for real external APIs
-│   └── reports/
-│       └── phase5-report.md   # AI-assisted engineering report for the tests and CI work
+│   ├── images/                # README screenshots
+│   └── reports/               # AI-assisted engineering reports (audit, phases, CI, README check)
 └── tests/
     ├── __init__.py
     ├── conftest.py

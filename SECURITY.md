@@ -31,15 +31,15 @@ This project is a **demonstration prototype** (level D per QUALITY_STANDARD.md).
 Key security features:
 - Secrets are managed via environment variables (never hardcoded)
 - Service account credentials are mounted read-only in Docker
-- Application logs never contain Telegram identifiers, message content, spreadsheet IDs, credential paths, or API keys (see below)
+- Application logs never contain Telegram user/chat identifiers, message content, spreadsheet IDs, credential paths, or API keys (see below)
 - Google Sheets writes use `value_input_option='RAW'` to prevent formula injection
-- Messages are deduplicated by message_id to prevent duplicate writes
+- Messages are deduplicated by `(chat_id, message_id)` in a bounded in-memory deque (last 1000 entries) to prevent duplicate writes
 
 ## What is NOT logged
 
 Application logs must not contain personal data or deployment secrets. In particular, the following are **never** written to logs:
 
-- Telegram `user_id` / `effective_user` (id, username, first/last name)
+- Telegram `chat_id`, `user_id` / `effective_user` (id, username, first/last name)
 - Message text or any other message content
 - Extracted lead fields (name, phone, service, date, time)
 - The original message attached to a saved lead
@@ -51,7 +51,7 @@ Exception logging records only the exception class/type. Full tracebacks and exc
 
 Each incoming request gets a random `correlation_id` (`uuid4`, generated at the start of `handle_text`). That opaque value is passed through the call chain (`extract_lead`, `append_lead`) and included in log lines, so the stages of one request can be correlated without exposing who sent it. It is not derived from any Telegram identifier and is safe to use for diagnostics and support.
 
-What **may** be logged: `correlation_id`, the fact that an event happened (message received, duplicate skipped, lead saved), message length, processing stage, and error type/class.
+What **may** be logged: `correlation_id`, the fact that an event happened (message received, duplicate skipped, lead saved), `message_id` (used to detect duplicates), message length, processing stage, and error type/class.
 
 ## Known limitations
 
