@@ -250,15 +250,25 @@ blocked.
 
 ## Testing and CI
 
-The test suite uses `pytest`, `pytest-asyncio`, and `pytest-cov`. Latest
-measured result:
+The test suite uses `pytest`, `pytest-asyncio`, and `pytest-cov`. The measured
+result below is **unit-test coverage**:
 
 ```text
-55 passed, 0 skipped
-TOTAL coverage: 99.30%
+81 passed, 0 skipped
+TOTAL unit-test coverage: 99.32%
 ```
 
-Coverage by module:
+All unit tests isolate every external dependency with mocks: Telegram updates
+are `MagicMock` objects, `llm.AsyncOpenAI` is patched, and `sheets.Credentials`,
+`gspread.authorize`, and worksheets are patched. No real Telegram, LLM, or
+Google Sheets request is made by the test suite.
+
+This means coverage proves application logic, not that the real external APIs
+are reachable or that the configured credentials and permissions are valid.
+Availability, latency, quota limits, provider-side schema changes, and Google
+API errors are outside the scope of this coverage.
+
+Unit-test coverage by module:
 
 | Module | Coverage |
 |---|---|
@@ -288,7 +298,18 @@ CI consists of two GitHub Actions workflows:
 - `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `bandit`,
   `coverage-gate`, and `modularity`.
 
-The coverage gate fails below 80%. The measured suite is at 99.30%.
+The coverage gate fails below 80%. The measured unit-test suite is at 99.32%.
+The mocked unit tests are a fast, mandatory CI step and stay unchanged.
+
+Real integrations are verified by a **manual** smoke test that uses dedicated
+test credentials. It is deliberately excluded from public CI so that no secrets
+are exposed. See
+[docs/integration-smoke-test.md](docs/integration-smoke-test.md) for
+preparation, step-by-step commands, expected results, and cleanup.
+
+A passing coverage gate does not prove that Telegram, the LLM provider, or
+Google Sheets are currently reachable. If the smoke test was not executed, the
+status of the real integrations is `NOT VERIFIED`.
 
 ## Security and privacy notes
 
@@ -366,6 +387,7 @@ If this project evolves beyond a demo, the planned work is:
 ├── credentials/
 │   └── .gitkeep
 ├── docs/
+│   ├── integration-smoke-test.md  # Manual smoke test for real external APIs
 │   └── reports/
 │       └── phase5-report.md   # AI-assisted engineering report for the tests and CI work
 └── tests/
@@ -374,6 +396,7 @@ If this project evolves beyond a demo, the planned work is:
     ├── test_config.py
     ├── test_handlers.py
     ├── test_llm.py
+    ├── test_logging_privacy.py
     ├── test_main.py
     ├── test_models.py
     └── test_sheets.py
