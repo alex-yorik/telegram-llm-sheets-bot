@@ -44,7 +44,7 @@ class GoogleSheetsClient:
             creds = Credentials.from_service_account_file(self._credentials_path, scopes=_SCOPES)
             self._client = gspread.authorize(creds)
             logger.info(
-                "GoogleSheetsClient initialized: spreadsheet_id=%s " "sheet=%s creds=%s",
+                "GoogleSheetsClient initialized: spreadsheet_id=%s sheet=%s creds=%s",
                 self._spreadsheet_id,
                 self._sheet_name,
                 self._credentials_path,

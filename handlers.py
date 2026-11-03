@@ -69,7 +69,7 @@ async def _reject_long_message(update: Update, text: str, correlation_id: str) -
     if len(text) <= MAX_MESSAGE_LENGTH:
         return False
     await update.message.reply_text(
-        f"Message is too long (max {MAX_MESSAGE_LENGTH} characters). " "Please send a shorter message."
+        f"Message is too long (max {MAX_MESSAGE_LENGTH} characters). Please send a shorter message."
     )
     logger.warning("Message too long (correlation_id=%s, length=%s)", correlation_id, len(text))
     return True
@@ -83,7 +83,7 @@ async def _extract_or_reply(update: Update, text: str, correlation_id: str) -> L
         lead = await extract_lead(text, correlation_id=correlation_id)
     except LLMValidationError:
         await update.message.reply_text(
-            "Could not extract data. Please send a message with more details " "(name, phone, service, etc.)."
+            "Could not extract data. Please send a message with more details (name, phone, service, etc.)."
         )
         return None
     except LLMRequestError:
@@ -97,8 +97,7 @@ async def _extract_or_reply(update: Update, text: str, correlation_id: str) -> L
     if not lead.has_data():
         logger.warning("Empty lead (correlation_id=%s)", correlation_id)
         await update.message.reply_text(
-            "Could not extract meaningful data. Please send a message with more "
-            "details (name, phone, service, etc.)."
+            "Could not extract meaningful data. Please send a message with more details (name, phone, service, etc.)."
         )
         return None
     return lead
@@ -136,7 +135,7 @@ def _format_answer(lead: Lead, saved: bool) -> str:
     if saved:
         answer += "\n✅ Data saved to spreadsheet"
     else:
-        answer += "\n⚠️ Data extracted but could not be saved to spreadsheet. " "Please try again later."
+        answer += "\n⚠️ Data extracted but could not be saved to spreadsheet. Please try again later."
     return answer
 
 

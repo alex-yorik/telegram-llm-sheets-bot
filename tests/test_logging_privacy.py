@@ -12,9 +12,7 @@ from llm import extract_lead
 from models import Lead
 from sheets import HEADER, GoogleSheetsClient, SheetsError
 
-CORRELATION_RE = re.compile(
-    r"correlation_id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
-)
+CORRELATION_RE = re.compile(r"correlation_id=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
 CHAT_ID = 987654321
 USER_ID = 555444333
 
