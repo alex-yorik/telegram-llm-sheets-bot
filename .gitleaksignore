@@ -13,3 +13,14 @@ c95744f0ac34f44fc64bc98ecc9aa0811c5dd659:tests/test_logging_privacy.py:generic-a
 # keyword `correlation_id=` (no credential follows). No secret is present.
 b3de7dc7b7558bb885a368697dc7f588315edf73:tests/test_logging_privacy.py:generic-api-key:186
 b3de7dc7b7558bb885a368697dc7f588315edf73:tests/test_logging_privacy.py:generic-api-key:201
+
+# Same false positives in PR #4 commits 76ad925 and 9208c4c: generic-api-key
+# matched the expression `secret_text, correlation_id=` in the privacy tests.
+# `secret_text` is a test variable name and the matched token is the literal
+# keyword `correlation_id=` (no credential follows). No secret is present.
+76ad9255b71f1eb3df96ddf19a3c1937be8c8f39:tests/test_logging_privacy.py:generic-api-key:275
+76ad9255b71f1eb3df96ddf19a3c1937be8c8f39:tests/test_logging_privacy.py:generic-api-key:330
+76ad9255b71f1eb3df96ddf19a3c1937be8c8f39:tests/test_logging_privacy.py:generic-api-key:351
+9208c4c381e015e2d99602ee45485ba36e920c52:tests/test_logging_privacy.py:generic-api-key:187
+9208c4c381e015e2d99602ee45485ba36e920c52:tests/test_logging_privacy.py:generic-api-key:330
+9208c4c381e015e2d99602ee45485ba36e920c52:tests/test_logging_privacy.py:generic-api-key:351

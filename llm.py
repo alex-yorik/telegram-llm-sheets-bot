@@ -5,6 +5,7 @@ import logging
 import re
 
 from openai import AsyncOpenAI, OpenAIError
+from openai.types.chat import ChatCompletion
 from pydantic import ValidationError
 
 from config import Settings, load_settings
@@ -37,6 +38,25 @@ def _strip_code_fences(content: str) -> str:
     if match:
         return match.group(1).strip()
     return text
+
+
+def _parse_lead_response(
+    response: ChatCompletion,
+    correlation_id: str | None,
+) -> Lead:
+    """Validates the LLM response and maps failures to LLMValidationError."""
+    try:
+        content = (response.choices[0].message.content or "").strip()
+        cleaned = _strip_code_fences(content)
+        data = json.loads(cleaned)
+        return Lead.model_validate(data)
+    except (json.JSONDecodeError, ValidationError, IndexError) as exc:
+        logger.error(
+            "Failed to validate LLM response (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
+        raise LLMValidationError(str(exc)) from exc
 
 
 async def extract_lead(
@@ -79,15 +99,4 @@ async def extract_lead(
         )
         raise LLMRequestError(str(exc)) from exc
 
-    try:
-        content = (response.choices[0].message.content or "").strip()
-        cleaned = _strip_code_fences(content)
-        data = json.loads(cleaned)
-        return Lead.model_validate(data)
-    except (json.JSONDecodeError, ValidationError, IndexError) as exc:
-        logger.error(
-            "Failed to validate LLM response (correlation_id=%s, error=%s)",
-            correlation_id,
-            type(exc).__name__,
-        )
-        raise LLMValidationError(str(exc)) from exc
+    return _parse_lead_response(response, correlation_id)
