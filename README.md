@@ -262,7 +262,7 @@ result below is **unit-test coverage**:
 
 ```text
 81 passed, 0 skipped
-TOTAL unit-test coverage: 99.32%
+TOTAL unit-test coverage: 99.33%
 ```
 
 All unit tests isolate every external dependency with mocks: Telegram updates
@@ -305,7 +305,13 @@ CI consists of two GitHub Actions workflows:
 - `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `pip-audit`,
   `bandit`, `coverage-gate`, and `modularity`.
 
-The coverage gate fails below 80%. The measured unit-test suite is at 99.32%.
+Protection for `main` is enforced by the active GitHub Ruleset `Main`
+(`26415946`), not by classic branch protection. The ruleset requires all 8
+status checks before a merge: `test (3.12)`, `lint`, `docker-build`,
+`modularity`, `coverage-gate`, `secrets-scan`, `bandit`, and `pip-audit`.
+`bandit` and `pip-audit` are therefore blocking checks.
+
+The coverage gate fails below 80%. The measured unit-test suite is at 99.33%.
 The mocked unit tests are a fast, mandatory CI step and stay unchanged.
 
 Real integrations are verified by a **manual** smoke test that uses dedicated
