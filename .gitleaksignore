@@ -7,3 +7,9 @@
 # that correlation IDs are logged while message content is not. No secret is present.
 c95744f0ac34f44fc64bc98ecc9aa0811c5dd659:tests/test_logging_privacy.py:generic-api-key:188
 c95744f0ac34f44fc64bc98ecc9aa0811c5dd659:tests/test_logging_privacy.py:generic-api-key:203
+
+# Same false positives after PR #2 was squash-merged into main as b3de7dc:
+# the squash diff shifted the lines to 186/201. Matched token is the literal
+# keyword `correlation_id=` (no credential follows). No secret is present.
+b3de7dc7b7558bb885a368697dc7f588315edf73:tests/test_logging_privacy.py:generic-api-key:186
+b3de7dc7b7558bb885a368697dc7f588315edf73:tests/test_logging_privacy.py:generic-api-key:201
