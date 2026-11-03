@@ -75,7 +75,7 @@ class GoogleSheetsClient:
         self,
         lead: Lead,
         original_message: str,
-        chat_id: int | None = None,
+        correlation_id: str | None = None,
     ) -> None:
         """Добавляет строку с данными заявки в таблицу."""
         try:
@@ -98,7 +98,7 @@ class GoogleSheetsClient:
                 created_at,
             ]
             worksheet.append_row(row, value_input_option="RAW")
-            logger.info("Lead saved to spreadsheet (chat_id=%s)", chat_id)
+            logger.info("Lead saved to spreadsheet (correlation_id=%s)", correlation_id)
         except SheetsError:
             raise
         except Exception as exc:

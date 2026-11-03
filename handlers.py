@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import uuid
 from collections import deque
 from typing import TYPE_CHECKING
 
@@ -46,13 +47,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
-def _is_duplicate(chat_id: int | None, message_id: int) -> bool:
+def _is_duplicate(chat_id: int | None, message_id: int, correlation_id: str) -> bool:
     """Проверяет, обрабатывалось ли сообщение ранее."""
     if (chat_id, message_id) in processed_messages:
         logger.info(
-            "Duplicate message_id=%s from chat_id=%s, skipping",
+            "Duplicate message received (correlation_id=%s, message_id=%s), skipping",
+            correlation_id,
             message_id,
-            chat_id,
         )
         return True
     return False
@@ -63,23 +64,23 @@ def _mark_seen(chat_id: int | None, message_id: int) -> None:
     processed_messages.append((chat_id, message_id))
 
 
-async def _reject_long_message(update: Update, text: str, chat_id: int | None) -> bool:
+async def _reject_long_message(update: Update, text: str, correlation_id: str) -> bool:
     """Отвечает отказом, если текст превышает лимит."""
     if len(text) <= MAX_MESSAGE_LENGTH:
         return False
     await update.message.reply_text(
         f"Message is too long (max {MAX_MESSAGE_LENGTH} characters). " "Please send a shorter message."
     )
-    logger.warning("Message too long from chat_id=%s, length=%s", chat_id, len(text))
+    logger.warning("Message too long (correlation_id=%s, length=%s)", correlation_id, len(text))
     return True
 
 
-async def _extract_or_reply(update: Update, text: str, chat_id: int | None) -> Lead | None:
+async def _extract_or_reply(update: Update, text: str, correlation_id: str) -> Lead | None:
     """Извлекает заявку или отвечает пользователю об ошибке."""
-    logger.info("Received message from chat_id=%s, length=%s", chat_id, len(text))
-    logger.info("Calling extract_lead for chat_id=%s", chat_id)
+    logger.info("Received message (correlation_id=%s, length=%s)", correlation_id, len(text))
+    logger.info("Calling extract_lead (correlation_id=%s)", correlation_id)
     try:
-        lead = await extract_lead(text)
+        lead = await extract_lead(text, correlation_id=correlation_id)
     except LLMValidationError:
         await update.message.reply_text(
             "Could not extract data. Please send a message with more details " "(name, phone, service, etc.)."
@@ -89,12 +90,12 @@ async def _extract_or_reply(update: Update, text: str, chat_id: int | None) -> L
         await update.message.reply_text("Processing error, try again later")
         return None
     except Exception:
-        logger.exception("Failed to process message chat_id=%s", chat_id)
+        logger.exception("Failed to process message (correlation_id=%s)", correlation_id)
         await update.message.reply_text("An error occurred")
         return None
 
     if not lead.has_data():
-        logger.warning("Empty lead from chat_id=%s", chat_id)
+        logger.warning("Empty lead (correlation_id=%s)", correlation_id)
         await update.message.reply_text(
             "Could not extract meaningful data. Please send a message with more "
             "details (name, phone, service, etc.)."
@@ -106,19 +107,19 @@ async def _extract_or_reply(update: Update, text: str, chat_id: int | None) -> L
 async def _save_lead(
     lead: Lead,
     original_message: str,
-    chat_id: int | None,
+    correlation_id: str,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> bool:
     """Сохраняет заявку в Google Sheets, возвращает признак успеха."""
     client = sheets_client or context.bot_data.get("sheets_client")
     if client is None:
-        logger.warning("SheetsClient not initialized, skipping write")
+        logger.warning("SheetsClient not initialized, skipping write (correlation_id=%s)", correlation_id)
         return False
     try:
-        await asyncio.to_thread(client.append_lead, lead, original_message, chat_id)
+        await asyncio.to_thread(client.append_lead, lead, original_message, correlation_id)
         return True
     except SheetsError:
-        logger.exception("Failed to save lead to spreadsheet chat_id=%s", chat_id)
+        logger.exception("Failed to save lead to spreadsheet (correlation_id=%s)", correlation_id)
         return False
 
 
@@ -146,17 +147,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     chat_id = update.effective_chat.id if update.effective_chat else None
     text = update.message.text
     message_id = update.message.message_id
+    correlation_id = str(uuid.uuid4())
 
-    if _is_duplicate(chat_id, message_id):
+    if _is_duplicate(chat_id, message_id, correlation_id):
         return
-    if await _reject_long_message(update, text, chat_id):
+    if await _reject_long_message(update, text, correlation_id):
         return
 
-    lead = await _extract_or_reply(update, text, chat_id)
+    lead = await _extract_or_reply(update, text, correlation_id)
     if lead is None:
         return
 
-    saved = await _save_lead(lead, text, chat_id, context)
+    saved = await _save_lead(lead, text, correlation_id, context)
     if saved:
         _mark_seen(chat_id, message_id)
     await update.message.reply_text(_format_answer(lead, saved))

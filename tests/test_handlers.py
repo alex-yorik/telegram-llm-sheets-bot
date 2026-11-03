@@ -1,7 +1,7 @@
 """Тесты обработчиков Telegram (LLM и Sheets замоканы)."""
 
 from collections import deque
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -98,8 +98,8 @@ async def test_handle_text_success():
 
         await handle_text(update, context)
 
-    mock_extract.assert_awaited_once_with("John wants to book, phone +123")
-    client.append_lead.assert_called_once_with(lead, "John wants to book, phone +123", 12345)
+    mock_extract.assert_awaited_once_with("John wants to book, phone +123", correlation_id=ANY)
+    client.append_lead.assert_called_once_with(lead, "John wants to book, phone +123", ANY)
     text = update.message.reply_text.call_args.args[0]
     assert "Data saved to spreadsheet" in text
 
@@ -353,4 +353,4 @@ async def test_handle_text_without_chat():
 
         await handle_text(update, make_context(client))
 
-    client.append_lead.assert_called_once_with(mock_extract.return_value, "hello", None)
+    client.append_lead.assert_called_once_with(mock_extract.return_value, "hello", ANY)
