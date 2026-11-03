@@ -30,8 +30,8 @@ def build_application() -> Application:
         client = GoogleSheetsClient()
     except SheetsError as exc:
         logger.warning(
-            "Google Sheets unavailable at startup: %s. Bot will start without write capability.",
-            exc,
+            "Google Sheets unavailable at startup (%s). Bot will start without write capability.",
+            type(exc).__name__,
         )
         client = None
     handlers.sheets_client = client

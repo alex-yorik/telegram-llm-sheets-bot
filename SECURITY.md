@@ -31,23 +31,27 @@ This project is a **demonstration prototype** (level D per QUALITY_STANDARD.md).
 Key security features:
 - Secrets are managed via environment variables (never hardcoded)
 - Service account credentials are mounted read-only in Docker
-- Application logs never contain Telegram identifiers or message content (see below)
+- Application logs never contain Telegram identifiers, message content, spreadsheet IDs, credential paths, or API keys (see below)
 - Google Sheets writes use `value_input_option='RAW'` to prevent formula injection
 - Messages are deduplicated by message_id to prevent duplicate writes
 
 ## What is NOT logged
 
-Application logs must not contain personal data. In particular, the following are **never** written to logs:
+Application logs must not contain personal data or deployment secrets. In particular, the following are **never** written to logs:
 
-- Telegram `chat_id` (neither `effective_chat.id` nor any other chat identifier)
 - Telegram `user_id` / `effective_user` (id, username, first/last name)
 - Message text or any other message content
 - Extracted lead fields (name, phone, service, date, time)
 - The original message attached to a saved lead
+- The Google Sheets `spreadsheet_id` or sheet URL
+- The service account `credentials` file path or its contents
+- API keys and bot tokens (including `TELEGRAM_BOT_TOKEN` and `LLM_API_KEY`)
 
-Instead, each incoming request gets a random `correlation_id` (`uuid4`, generated at the start of `handle_text`). That opaque value is passed through the call chain (`extract_lead`, `append_lead`) and included in log lines, so the stages of one request can be correlated without exposing who sent it.
+Exception logging records only the exception class/type. Full tracebacks and exception messages are not emitted for LLM, Sheets, and message-processing failures, because third-party error payloads can embed request content, spreadsheet IDs, or credential paths.
 
-What **may** be logged: the fact that an event happened (message received, duplicate skipped, lead saved), message length, processing stage, duration, and error type/class. `correlation_id` is random per request and is not derived from any Telegram identifier.
+Each incoming request gets a random `correlation_id` (`uuid4`, generated at the start of `handle_text`). That opaque value is passed through the call chain (`extract_lead`, `append_lead`) and included in log lines, so the stages of one request can be correlated without exposing who sent it. It is not derived from any Telegram identifier and is safe to use for diagnostics and support.
+
+What **may** be logged: `correlation_id`, the fact that an event happened (message received, duplicate skipped, lead saved), message length, processing stage, and error type/class.
 
 ## Known limitations
 

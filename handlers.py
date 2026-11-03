@@ -89,8 +89,12 @@ async def _extract_or_reply(update: Update, text: str, correlation_id: str) -> L
     except LLMRequestError:
         await update.message.reply_text("Processing error, try again later")
         return None
-    except Exception:
-        logger.exception("Failed to process message (correlation_id=%s)", correlation_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Failed to process message (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
         await update.message.reply_text("An error occurred")
         return None
 
@@ -117,8 +121,12 @@ async def _save_lead(
     try:
         await asyncio.to_thread(client.append_lead, lead, original_message, correlation_id)
         return True
-    except SheetsError:
-        logger.exception("Failed to save lead to spreadsheet (correlation_id=%s)", correlation_id)
+    except SheetsError as exc:
+        logger.error(
+            "Failed to save lead to spreadsheet (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
         return False
 
 

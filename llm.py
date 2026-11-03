@@ -63,10 +63,14 @@ async def extract_lead(text: str, correlation_id: str | None = None) -> Lead:
         )
         logger.info("LLM response received (correlation_id=%s)", correlation_id)
     except OpenAIError as exc:
-        logger.exception("LLM request failed (correlation_id=%s)", correlation_id)
+        logger.error("LLM request failed (correlation_id=%s, error=%s)", correlation_id, type(exc).__name__)
         raise LLMRequestError(str(exc)) from exc
-    except Exception as exc:
-        logger.exception("Unexpected error during LLM request (correlation_id=%s)", correlation_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Unexpected error during LLM request (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
         raise LLMRequestError(str(exc)) from exc
 
     try:
@@ -75,5 +79,9 @@ async def extract_lead(text: str, correlation_id: str | None = None) -> Lead:
         data = json.loads(cleaned)
         return Lead.model_validate(data)
     except (json.JSONDecodeError, ValidationError, IndexError) as exc:
-        logger.exception("Failed to validate LLM response (correlation_id=%s)", correlation_id)
+        logger.error(
+            "Failed to validate LLM response (correlation_id=%s, error=%s)",
+            correlation_id,
+            type(exc).__name__,
+        )
         raise LLMValidationError(str(exc)) from exc

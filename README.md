@@ -176,9 +176,12 @@ docker compose down && docker compose up -d --build
 Expected startup lines (values depend on your configuration):
 
 ```text
-sheets - INFO - GoogleSheetsClient initialized: spreadsheet_id=... sheet=Sheet1 creds=...
+sheets - INFO - GoogleSheetsClient initialized (sheet=Sheet1)
 __main__ - INFO - Bot started (polling).
 ```
+
+Logs never include the spreadsheet ID, the service account file path, API keys,
+Telegram `chat_id`/`user_id`, or message content.
 
 ## Environment variables
 
@@ -232,8 +235,8 @@ formula injection. `Created At` is a UTC ISO-8601 timestamp.
 
 | Situation | What the user sees | What happens internally |
 |---|---|---|
-| Message longer than 2000 characters | `Message is too long (max 2000 characters). Please send a shorter message.` | Warning logged with `chat_id` and length; no LLM call, no sheet write. |
-| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged. |
+| Message longer than 2000 characters | `Message is too long (max 2000 characters). Please send a shorter message.` | Warning logged with `correlation_id` and length; no LLM call, no sheet write. |
+| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged with `correlation_id` and `message_id` (the dedup key itself is not logged). |
 | LLM returns invalid JSON or fails validation | `Could not extract data. Please send a message with more details (name, phone, service, etc.).` | Error logged; no sheet write. |
 | LLM network, API, or timeout error | `Processing error, try again later` | Error logged; no sheet write. |
 | LLM returns an empty lead | `Could not extract meaningful data. Please send a message with more details (name, phone, service, etc.).` | Warning logged; no sheet write. |
@@ -296,8 +299,11 @@ full security notes. Key points:
   `credentials/*.json` are gitignored and excluded from the Docker build context.
 - The service account key is mounted read-only into the container.
 - The container runs as a non-root user (`uid 1000`).
-- Logs record metadata only (`chat_id`, message length, length checks, and
-  outcomes). Message text and extracted personal data are not written to logs.
+- Logs record metadata only (`correlation_id`, message length, processing stage,
+  and outcome). Telegram `chat_id`/`user_id`, message text, extracted personal
+  data, spreadsheet ID, service account file path, and API keys are never written
+  to logs. `correlation_id` is a random per-request UUID and is safe for support
+  diagnostics.
 - Message content is sent to a third-party LLM provider, and extracted data is
   stored in Google Sheets. Do not use this bot with real personal data without
   reviewing provider policies, obtaining user consent, and checking applicable
