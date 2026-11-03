@@ -16,11 +16,11 @@ fictional.
 
 ## How this project was built
 
-I am not a professional software developer. This project was built with AI
-coding assistants ("vibe coding"). I define the product idea, requirements and
-acceptance criteria, direct the AI tools, run the results, review behavior, and
-decide what ships. Reviews in this repo are AI-assisted self-reviews, not
-independent third-party audits.
+This project was developed using AI-assisted coding tools. I define the product
+requirements, establish acceptance criteria, guide the development process,
+validate functionality, review the implementation, and make the final technical
+decisions. AI-assisted reviews are used throughout development. They should not
+be considered independent third-party audits.
 
 ## What the bot does
 
