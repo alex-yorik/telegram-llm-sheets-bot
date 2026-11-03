@@ -28,3 +28,14 @@ b3de7dc7b7558bb885a368697dc7f588315edf73:tests/test_logging_privacy.py:generic-a
 # False positive introduced by the explanatory comment itself in commit 80a38a5:
 # the comment contained the trigger text for the generic rule. No secret is present.
 80a38a571977e0e143089c73a0644065c30c9908:.gitleaksignore:generic-api-key:18
+
+# Same false positives after PR #4 was squash-merged into main as d3754d6:
+# generic-api-key matched the same test-call pattern (a test-text variable
+# followed by the correlation-id keyword assignment with a test literal).
+# The matched token is the keyword assignment itself; no credential follows.
+# Fixed at the source in this branch; kept here only so full-history scans
+# still recognize the historical commit. No secret is present.
+d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:187
+d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:275
+d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:330
+d3754d6e81a13dd265af73ccea2b2a94a65f3c0c:tests/test_logging_privacy.py:generic-api-key:351
