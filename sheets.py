@@ -1,4 +1,4 @@
-"""Интеграция с Google Sheets для сохранения заявок."""
+"""Google Sheets integration for saving leads."""
 
 import datetime
 import logging
@@ -25,11 +25,11 @@ _SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 
 class SheetsError(Exception):
-    """Ошибка работы с Google Sheets."""
+    """Google Sheets operation error."""
 
 
 class GoogleSheetsClient:
-    """Клиент для записи заявок в Google Таблицу."""
+    """Client for writing leads to a Google Spreadsheet."""
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class GoogleSheetsClient:
             creds = Credentials.from_service_account_file(self._credentials_path, scopes=_SCOPES)
             self._client = gspread.authorize(creds)
             logger.info(
-                "GoogleSheetsClient initialized: spreadsheet_id=%s " "sheet=%s creds=%s",
+                "GoogleSheetsClient initialized: spreadsheet_id=%s sheet=%s creds=%s",
                 self._spreadsheet_id,
                 self._sheet_name,
                 self._credentials_path,
@@ -54,7 +54,7 @@ class GoogleSheetsClient:
             raise SheetsError(str(exc)) from exc
 
     def _get_worksheet(self) -> gspread.Worksheet:
-        """Открывает worksheet по имени или возвращает первый лист."""
+        """Opens a worksheet by name or returns the first sheet."""
         try:
             spreadsheet = self._client.open_by_key(self._spreadsheet_id)
             try:
@@ -75,9 +75,9 @@ class GoogleSheetsClient:
         self,
         lead: Lead,
         original_message: str,
-        chat_id: int | None = None,
+        correlation_id: str | None = None,
     ) -> None:
-        """Добавляет строку с данными заявки в таблицу."""
+        """Appends a row with lead data to the spreadsheet."""
         try:
             worksheet = self._get_worksheet()
             values = worksheet.get_all_values()
@@ -98,7 +98,7 @@ class GoogleSheetsClient:
                 created_at,
             ]
             worksheet.append_row(row, value_input_option="RAW")
-            logger.info("Lead saved to spreadsheet (chat_id=%s)", chat_id)
+            logger.info("Lead saved to spreadsheet (correlation_id=%s)", correlation_id)
         except SheetsError:
             raise
         except Exception as exc:

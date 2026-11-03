@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# Development, testing and CI tools
+pytest==9.0.3
+pytest-cov==4.1.0
+pytest-asyncio==1.4.1.post1
+ruff==0.1.6
+bandit==1.7.6
+pip-audit==2.10.1

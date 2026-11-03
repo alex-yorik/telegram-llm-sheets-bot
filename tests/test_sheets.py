@@ -104,7 +104,7 @@ def test_append_lead_success():
         time="17:00",
     )
 
-    client.append_lead(lead, "original message", chat_id=42)
+    client.append_lead(lead, "original message", correlation_id="test-correlation-id")
 
     worksheet.append_row.assert_called_once()
     row = worksheet.append_row.call_args.args[0]
@@ -122,7 +122,7 @@ def test_append_lead_creates_header_if_empty():
     worksheet.get_all_values.return_value = []
     client._get_worksheet = MagicMock(return_value=worksheet)
 
-    client.append_lead(Lead(name="John"), "", chat_id=None)
+    client.append_lead(Lead(name="John"), "", correlation_id=None)
 
     assert worksheet.append_row.call_count == 2
     assert worksheet.append_row.call_args_list[0].args[0] == HEADER
@@ -136,7 +136,7 @@ def test_append_lead_clears_whitespace_only_sheet():
     worksheet.get_all_values.return_value = [["   ", ""]]
     client._get_worksheet = MagicMock(return_value=worksheet)
 
-    client.append_lead(Lead(name="John"), "", chat_id=None)
+    client.append_lead(Lead(name="John"), "", correlation_id=None)
 
     worksheet.clear.assert_called_once()
     assert worksheet.append_row.call_count == 2
@@ -150,7 +150,7 @@ def test_append_lead_sheets_error():
     client._get_worksheet = MagicMock(return_value=worksheet)
 
     with pytest.raises(SheetsError):
-        client.append_lead(Lead(name="John"), "", chat_id=None)
+        client.append_lead(Lead(name="John"), "", correlation_id=None)
 
 
 def test_append_lead_reraises_sheets_error():
@@ -159,4 +159,4 @@ def test_append_lead_reraises_sheets_error():
     client._get_worksheet = MagicMock(side_effect=SheetsError("already wrapped"))
 
     with pytest.raises(SheetsError, match="already wrapped"):
-        client.append_lead(Lead(name="John"), "", chat_id=None)
+        client.append_lead(Lead(name="John"), "", correlation_id=None)

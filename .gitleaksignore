@@ -1,3 +1,9 @@
 # False positive: generic-api-key matched the `Credentials.from_service_account_file(
 #     self._credentials_path, scopes=_SCOPES)` call in commit 06ba5bd. No secret is present.
 06ba5bd318a373506d1cbfcf20dacdfc956f82b6:sheets.py:generic-api-key:49
+
+# False positives: generic-api-key matched test correlation_id literals
+# ("corr-llm-123" / "corr-sheets-1") in tests/test_logging_privacy.py, which assert
+# that correlation IDs are logged while message content is not. No secret is present.
+c95744f0ac34f44fc64bc98ecc9aa0811c5dd659:tests/test_logging_privacy.py:generic-api-key:188
+c95744f0ac34f44fc64bc98ecc9aa0811c5dd659:tests/test_logging_privacy.py:generic-api-key:203

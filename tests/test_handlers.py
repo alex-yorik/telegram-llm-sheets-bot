@@ -1,6 +1,7 @@
 """Тесты обработчиков Telegram (LLM и Sheets замоканы)."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from collections import deque
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -97,8 +98,8 @@ async def test_handle_text_success():
 
         await handle_text(update, context)
 
-    mock_extract.assert_awaited_once_with("John wants to book, phone +123")
-    client.append_lead.assert_called_once_with(lead, "John wants to book, phone +123", 12345)
+    mock_extract.assert_awaited_once_with("John wants to book, phone +123", correlation_id=ANY)
+    client.append_lead.assert_called_once_with(lead, "John wants to book, phone +123", ANY)
     text = update.message.reply_text.call_args.args[0]
     assert "Data saved to spreadsheet" in text
 
@@ -232,14 +233,18 @@ async def test_handle_text_too_long(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_handle_text_duplicate_message():
-    """Повторный message_id в том же чате игнорируется."""
+    """Повторная доставка одного update не создаёт дубль."""
+    client = MagicMock()
+    context = make_context(client)
+
     with patch("handlers.extract_lead", new_callable=AsyncMock) as mock_extract:
         mock_extract.return_value = Lead(name="John")
 
-        await handle_text(make_update(message_id=999), make_context())
-        await handle_text(make_update(message_id=999), make_context())
+        await handle_text(make_update(message_id=999), context)
+        await handle_text(make_update(message_id=999), context)
 
     mock_extract.assert_awaited_once()
+    client.append_lead.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -255,17 +260,86 @@ async def test_handle_text_same_message_id_in_different_chats():
 
 
 @pytest.mark.asyncio
-async def test_handle_text_clears_processed_cache(monkeypatch):
-    """При переполнении кэш обработанных сообщений очищается."""
-    monkeypatch.setattr(handlers, "MAX_PROCESSED_MESSAGES", 0)
+async def test_handle_text_processed_cache_respects_limit(monkeypatch):
+    """Кэш не превышает MAX_PROCESSED_MESSAGES записей."""
+    monkeypatch.setattr(handlers, "processed_messages", deque(maxlen=3))
+    client = MagicMock()
+    context = make_context(client)
 
     with patch("handlers.extract_lead", new_callable=AsyncMock) as mock_extract:
         mock_extract.return_value = Lead(name="John")
 
-        await handle_text(make_update(message_id=1), make_context())
+        for message_id in range(1, 6):
+            await handle_text(make_update(message_id=message_id), context)
 
-    assert handlers.processed_messages == set()
+    assert len(handlers.processed_messages) == 3
+    assert mock_extract.await_count == 5
+
+
+@pytest.mark.asyncio
+async def test_handle_text_processed_cache_evicts_oldest_only(monkeypatch):
+    """При переполнении удаляются только старейшие записи, новые сохраняются."""
+    monkeypatch.setattr(handlers, "processed_messages", deque(maxlen=3))
+    client = MagicMock()
+    context = make_context(client)
+
+    with patch("handlers.extract_lead", new_callable=AsyncMock) as mock_extract:
+        mock_extract.return_value = Lead(name="John")
+
+        for message_id in range(1, 5):
+            await handle_text(make_update(message_id=message_id), context)
+
+    assert list(handlers.processed_messages) == [(12345, 2), (12345, 3), (12345, 4)]
+    assert (12345, 1) not in handlers.processed_messages
+
+
+@pytest.mark.asyncio
+async def test_handle_text_retry_after_llm_error():
+    """После временной ошибки LLM повторная попытка возможна."""
+    client = MagicMock()
+    context = make_context(client)
+
+    with patch("handlers.extract_lead", new_callable=AsyncMock) as mock_extract:
+        mock_extract.side_effect = [LLMRequestError("API Error"), Lead(name="John")]
+
+        await handle_text(make_update(message_id=42), context)
+        await handle_text(make_update(message_id=42), context)
+
+    assert mock_extract.await_count == 2
+    client.append_lead.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_handle_text_retry_after_sheets_error():
+    """После временной ошибки Sheets повторная попытка возможна."""
+    client = MagicMock()
+    client.append_lead.side_effect = [SheetsError("Sheets Error"), None]
+    context = make_context(client)
+
+    with patch("handlers.extract_lead", new_callable=AsyncMock) as mock_extract:
+        mock_extract.return_value = Lead(name="John")
+
+        await handle_text(make_update(message_id=43), context)
+        await handle_text(make_update(message_id=43), context)
+
+    assert mock_extract.await_count == 2
+    assert client.append_lead.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_handle_text_success_not_reprocessed():
+    """Успешно завершённое сообщение не обрабатывается повторно."""
+    client = MagicMock()
+    context = make_context(client)
+
+    with patch("handlers.extract_lead", new_callable=AsyncMock) as mock_extract:
+        mock_extract.return_value = Lead(name="John")
+
+        await handle_text(make_update(message_id=44), context)
+        await handle_text(make_update(message_id=44), context)
+
     mock_extract.assert_awaited_once()
+    client.append_lead.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -279,4 +353,4 @@ async def test_handle_text_without_chat():
 
         await handle_text(update, make_context(client))
 
-    client.append_lead.assert_called_once_with(mock_extract.return_value, "hello", None)
+    client.append_lead.assert_called_once_with(mock_extract.return_value, "hello", ANY)

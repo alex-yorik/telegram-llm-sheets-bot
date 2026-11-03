@@ -1,4 +1,4 @@
-"""Точка входа Telegram-бота (polling)."""
+"""Telegram bot entry point (polling)."""
 
 import asyncio
 import logging
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup_logging() -> None:
-    """Настраивает базовое логирование."""
+    """Sets up basic logging."""
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -25,12 +25,12 @@ def setup_logging() -> None:
 
 
 def build_application() -> Application:
-    """Создает и настраивает Application."""
+    """Creates and configures the Application."""
     try:
         client = GoogleSheetsClient()
     except SheetsError as exc:
         logger.warning(
-            "Google Sheets unavailable at startup: %s. " "Bot will start without write capability.",
+            "Google Sheets unavailable at startup: %s. Bot will start without write capability.",
             exc,
         )
         client = None
@@ -61,7 +61,7 @@ def build_application() -> Application:
 
 
 async def main() -> None:
-    """Запускает бота с polling и корректным завершением."""
+    """Runs the bot with polling and graceful shutdown."""
     setup_logging()
     application = build_application()
 

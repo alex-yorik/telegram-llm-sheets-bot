@@ -1,4 +1,4 @@
-"""Извлечение данных заявки из текста через LLM."""
+"""Extract lead data from text via LLM."""
 
 import json
 import logging
@@ -23,15 +23,15 @@ SYSTEM_PROMPT = (
 
 
 class LLMRequestError(Exception):
-    """Ошибка запроса к LLM (сеть, API, таймаут)."""
+    """LLM request error (network, API, timeout)."""
 
 
 class LLMValidationError(Exception):
-    """LLM вернул данные, которые не удалось распарсить/валидировать."""
+    """The LLM returned data that could not be parsed/validated."""
 
 
 def _strip_code_fences(content: str) -> str:
-    """Убирает markdown code fences из ответа LLM."""
+    """Strips markdown code fences from the LLM response."""
     text = content.strip()
     match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.DOTALL)
     if match:
@@ -39,10 +39,11 @@ def _strip_code_fences(content: str) -> str:
     return text
 
 
-async def extract_lead(text: str) -> Lead:
-    """Извлекает данные заявки из текста через LLM."""
+async def extract_lead(text: str, correlation_id: str | None = None) -> Lead:
+    """Extracts lead data from the text via LLM."""
     logger.info(
-        "LLM request sent (base_url=%s, model=%s, length=%s)",
+        "LLM request sent (correlation_id=%s, base_url=%s, model=%s, length=%s)",
+        correlation_id,
         settings.llm_api_base,
         settings.llm_model,
         len(text),
@@ -60,12 +61,12 @@ async def extract_lead(text: str) -> Lead:
                 {"role": "user", "content": text},
             ],
         )
-        logger.info("LLM response received")
+        logger.info("LLM response received (correlation_id=%s)", correlation_id)
     except OpenAIError as exc:
-        logger.exception("LLM request failed")
+        logger.exception("LLM request failed (correlation_id=%s)", correlation_id)
         raise LLMRequestError(str(exc)) from exc
     except Exception as exc:
-        logger.exception("Unexpected error during LLM request")
+        logger.exception("Unexpected error during LLM request (correlation_id=%s)", correlation_id)
         raise LLMRequestError(str(exc)) from exc
 
     try:
@@ -74,5 +75,5 @@ async def extract_lead(text: str) -> Lead:
         data = json.loads(cleaned)
         return Lead.model_validate(data)
     except (json.JSONDecodeError, ValidationError, IndexError) as exc:
-        logger.exception("Failed to validate LLM response")
+        logger.exception("Failed to validate LLM response (correlation_id=%s)", correlation_id)
         raise LLMValidationError(str(exc)) from exc
