@@ -184,7 +184,7 @@ async def test_extract_lead_logs_correlation_id_not_content(caplog, test_setting
         client = AsyncMock()
         client.chat.completions.create = AsyncMock(return_value=response)
         client_class.return_value = client
-        await extract_lead(secret_text, **{"correlation_" + "id": "corr-llm-123"}, settings=test_settings)
+        await extract_lead(secret_text, correlation_id="corr-llm-123", settings=test_settings)
 
     assert "corr-llm-123" in caplog.text
     assert secret_text not in caplog.text
@@ -199,7 +199,7 @@ def test_append_lead_logs_correlation_id_not_content(caplog):
     client._get_worksheet = MagicMock(return_value=worksheet)
     secret_text = "MY-SECRET-MESSAGE-CONTENT-77"
 
-    client.append_lead(Lead(name="John"), secret_text, **{"correlation_" + "id": "corr-sheets-1"})
+    client.append_lead(Lead(name="John"), secret_text, correlation_id="corr-sheets-1")
 
     assert "corr-sheets-1" in caplog.text
     assert secret_text not in caplog.text
@@ -272,7 +272,7 @@ def test_sheets_save_error_does_not_log_content_or_spreadsheet_id(caplog):
     client._get_worksheet = MagicMock(return_value=worksheet)
 
     with pytest.raises(SheetsError):
-        client.append_lead(Lead(name="John"), secret_text, **{"correlation_" + "id": "corr-sheets-2"})
+        client.append_lead(Lead(name="John"), secret_text, correlation_id="corr-sheets-2")
 
     assert secret_text not in caplog.text
     assert "test-spreadsheet-id" not in caplog.text
@@ -327,7 +327,7 @@ async def test_llm_validation_error_does_not_log_content_or_traceback(caplog, te
         client.chat.completions.create = AsyncMock(return_value=response)
         client_class.return_value = client
         with pytest.raises(LLMValidationError):
-            await extract_lead(secret_text, **{"correlation_" + "id": "corr-bad-json"}, settings=test_settings)
+            await extract_lead(secret_text, correlation_id="corr-bad-json", settings=test_settings)
 
     assert "corr-bad-json" in caplog.text
     assert secret_text not in caplog.text
@@ -348,7 +348,7 @@ async def test_llm_request_error_does_not_log_api_key_or_content(caplog, test_se
         )
         client_class.return_value = client
         with pytest.raises(LLMRequestError):
-            await extract_lead(secret_text, **{"correlation_" + "id": "corr-llm-fail"}, settings=test_settings)
+            await extract_lead(secret_text, correlation_id="corr-llm-fail", settings=test_settings)
 
     assert secret_key not in caplog.text
     assert secret_text not in caplog.text
