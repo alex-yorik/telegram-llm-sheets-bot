@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from config import Settings
 from llm import LLMRequestError, LLMValidationError, extract_lead
 from models import Lead
 from sheets import SheetsError
@@ -75,12 +76,17 @@ async def _reject_long_message(update: Update, text: str, correlation_id: str) -
     return True
 
 
-async def _extract_or_reply(update: Update, text: str, correlation_id: str) -> Lead | None:
+async def _extract_or_reply(
+    update: Update,
+    text: str,
+    correlation_id: str,
+    settings: Settings | None = None,
+) -> Lead | None:
     """Extracts the lead or replies to the user with an error."""
     logger.info("Received message (correlation_id=%s, length=%s)", correlation_id, len(text))
     logger.info("Calling extract_lead (correlation_id=%s)", correlation_id)
     try:
-        lead = await extract_lead(text, correlation_id=correlation_id)
+        lead = await extract_lead(text, correlation_id=correlation_id, settings=settings)
     except LLMValidationError:
         await update.message.reply_text(
             "Could not extract data. Please send a message with more details (name, phone, service, etc.)."
@@ -161,7 +167,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if await _reject_long_message(update, text, correlation_id):
         return
 
-    lead = await _extract_or_reply(update, text, correlation_id)
+    settings = context.bot_data.get("settings")
+    lead = await _extract_or_reply(update, text, correlation_id, settings=settings)
     if lead is None:
         return
 

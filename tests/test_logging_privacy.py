@@ -172,7 +172,7 @@ async def test_correlation_id_differs_between_requests(caplog):
 
 
 @pytest.mark.asyncio
-async def test_extract_lead_logs_correlation_id_not_content(caplog):
+async def test_extract_lead_logs_correlation_id_not_content(caplog, test_settings):
     """LLM-слой пишет correlation_id, но не текст сообщения."""
     caplog.set_level(logging.INFO, logger="llm")
     secret_text = "MY-SECRET-MESSAGE-CONTENT-99"
@@ -184,7 +184,7 @@ async def test_extract_lead_logs_correlation_id_not_content(caplog):
         client = AsyncMock()
         client.chat.completions.create = AsyncMock(return_value=response)
         client_class.return_value = client
-        await extract_lead(secret_text, correlation_id="corr-llm-123")
+        await extract_lead(secret_text, correlation_id="corr-llm-123", settings=test_settings)
 
     assert "corr-llm-123" in caplog.text
     assert secret_text not in caplog.text
@@ -279,7 +279,7 @@ def test_sheets_save_error_does_not_log_content_or_spreadsheet_id(caplog):
     assert "Traceback" not in caplog.text
 
 
-def test_main_startup_failure_does_not_log_credentials_path(caplog):
+def test_main_startup_failure_does_not_log_credentials_path(caplog, test_settings):
     """Недоступные credentials при старте не пишут путь к файлу в логи."""
     caplog.set_level(logging.INFO, logger="main")
     secret_credentials = "/tmp/secret-service-account.json"
@@ -291,7 +291,7 @@ def test_main_startup_failure_does_not_log_credentials_path(caplog):
         patch("main.GoogleSheetsClient", side_effect=SheetsError(f"cannot read {secret_credentials}")),
         patch("main.Application.builder", return_value=builder),
     ):
-        main.build_application()
+        main.build_application(test_settings)
 
     assert secret_credentials not in caplog.text
     assert "Traceback" not in caplog.text
@@ -315,7 +315,7 @@ async def test_handler_exception_does_not_log_content_or_traceback(caplog):
 
 
 @pytest.mark.asyncio
-async def test_llm_validation_error_does_not_log_content_or_traceback(caplog):
+async def test_llm_validation_error_does_not_log_content_or_traceback(caplog, test_settings):
     """Невалидный ответ LLM не печатает traceback с исходным содержимым."""
     caplog.set_level(logging.INFO, logger="llm")
     secret_text = "MY-SECRET-VALIDATION-CONTENT-55"
@@ -327,7 +327,7 @@ async def test_llm_validation_error_does_not_log_content_or_traceback(caplog):
         client.chat.completions.create = AsyncMock(return_value=response)
         client_class.return_value = client
         with pytest.raises(LLMValidationError):
-            await extract_lead(secret_text, correlation_id="corr-bad-json")
+            await extract_lead(secret_text, correlation_id="corr-bad-json", settings=test_settings)
 
     assert "corr-bad-json" in caplog.text
     assert secret_text not in caplog.text
@@ -335,7 +335,7 @@ async def test_llm_validation_error_does_not_log_content_or_traceback(caplog):
 
 
 @pytest.mark.asyncio
-async def test_llm_request_error_does_not_log_api_key_or_content(caplog):
+async def test_llm_request_error_does_not_log_api_key_or_content(caplog, test_settings):
     """Ошибка LLM-запроса не раскрывает API-ключ и текст сообщения."""
     caplog.set_level(logging.INFO, logger="llm")
     secret_text = "MY-SECRET-LLM-CONTENT-66"
@@ -348,7 +348,7 @@ async def test_llm_request_error_does_not_log_api_key_or_content(caplog):
         )
         client_class.return_value = client
         with pytest.raises(LLMRequestError):
-            await extract_lead(secret_text, correlation_id="corr-llm-fail")
+            await extract_lead(secret_text, correlation_id="corr-llm-fail", settings=test_settings)
 
     assert secret_key not in caplog.text
     assert secret_text not in caplog.text

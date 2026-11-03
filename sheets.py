@@ -6,7 +6,6 @@ import logging
 import gspread
 from google.oauth2.service_account import Credentials
 
-from config import settings
 from models import Lead
 
 logger = logging.getLogger(__name__)
@@ -33,13 +32,13 @@ class GoogleSheetsClient:
 
     def __init__(
         self,
-        credentials_path: str | None = None,
-        spreadsheet_id: str | None = None,
-        sheet_name: str | None = None,
+        credentials_path: str,
+        spreadsheet_id: str,
+        sheet_name: str = "Sheet1",
     ) -> None:
-        self._credentials_path = credentials_path or settings.google_application_credentials
-        self._spreadsheet_id = spreadsheet_id or settings.google_spreadsheet_id
-        self._sheet_name = sheet_name or settings.google_sheet_name
+        self._credentials_path = credentials_path
+        self._spreadsheet_id = spreadsheet_id
+        self._sheet_name = sheet_name
         try:
             creds = Credentials.from_service_account_file(self._credentials_path, scopes=_SCOPES)
             self._client = gspread.authorize(creds)

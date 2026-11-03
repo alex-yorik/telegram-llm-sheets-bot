@@ -1,15 +1,25 @@
-"""Общая настройка тестов: фиктивные значения окружения без реальных ключей."""
-
-import os
+"""Общая настройка тестов: изолированные настройки без глобального окружения."""
 
 import pytest
 
-os.environ["TELEGRAM_BOT_TOKEN"] = "0000000000:TEST_TOKEN"
-os.environ["LLM_API_KEY"] = "test-llm-key"
-os.environ["LLM_API_BASE"] = "https://llm.example.test/v1"
-os.environ["GOOGLE_SPREADSHEET_ID"] = "test-spreadsheet-id"
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/tmp/test-service-account.json"
-os.environ["LOG_LEVEL"] = "INFO"
+from config import Settings
+
+
+@pytest.fixture
+def test_settings() -> Settings:
+    """Возвращает валидные тестовые настройки без чтения .env и os.environ."""
+    return Settings(
+        _env_file=None,
+        telegram_bot_token="0000000000:TEST_TOKEN",
+        llm_api_key="test-llm-key",
+        llm_api_base="https://llm.example.test/v1",
+        llm_model="gpt-4o-mini",
+        llm_timeout_seconds=30,
+        google_spreadsheet_id="test-spreadsheet-id",
+        google_sheet_name="Sheet1",
+        google_application_credentials="/tmp/test-service-account.json",
+        log_level="INFO",
+    )
 
 
 @pytest.fixture(autouse=True)

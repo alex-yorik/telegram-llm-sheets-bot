@@ -7,7 +7,7 @@ import re
 from openai import AsyncOpenAI, OpenAIError
 from pydantic import ValidationError
 
-from config import settings
+from config import Settings, load_settings
 from models import Lead
 
 logger = logging.getLogger(__name__)
@@ -39,8 +39,14 @@ def _strip_code_fences(content: str) -> str:
     return text
 
 
-async def extract_lead(text: str, correlation_id: str | None = None) -> Lead:
+async def extract_lead(
+    text: str,
+    correlation_id: str | None = None,
+    settings: Settings | None = None,
+) -> Lead:
     """Extracts lead data from the text via LLM."""
+    if settings is None:
+        settings = load_settings()
     logger.info(
         "LLM request sent (correlation_id=%s, base_url=%s, model=%s, length=%s)",
         correlation_id,

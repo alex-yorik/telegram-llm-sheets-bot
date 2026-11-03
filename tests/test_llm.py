@@ -18,9 +18,12 @@ def make_response(content: str | None):
 
 
 @pytest.fixture
-def openai_client():
-    """Подменяет AsyncOpenAI и возвращает мок клиента."""
-    with patch("llm.AsyncOpenAI") as client_class:
+def openai_client(test_settings):
+    """Подменяет AsyncOpenAI и загрузку настроек, возвращает мок клиента."""
+    with (
+        patch("llm.AsyncOpenAI") as client_class,
+        patch("llm.load_settings", return_value=test_settings),
+    ):
         client = AsyncMock()
         client.chat.completions.create = AsyncMock()
         client_class.return_value = client
@@ -44,6 +47,17 @@ async def test_extract_lead_valid_json(openai_client):
         "role": "user",
         "content": "John wants to book, phone +123",
     }
+
+
+@pytest.mark.asyncio
+async def test_extract_lead_uses_explicit_settings(openai_client, test_settings):
+    """Явно переданные настройки не требуют повторной загрузки конфигурации."""
+    openai_client.chat.completions.create.return_value = make_response('{"name": "John"}')
+
+    with patch("llm.load_settings") as load:
+        await extract_lead("test", settings=test_settings)
+
+    load.assert_not_called()
 
 
 @pytest.mark.asyncio

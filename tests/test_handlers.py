@@ -98,7 +98,7 @@ async def test_handle_text_success():
 
         await handle_text(update, context)
 
-    mock_extract.assert_awaited_once_with("John wants to book, phone +123", correlation_id=ANY)
+    mock_extract.assert_awaited_once_with("John wants to book, phone +123", correlation_id=ANY, settings=None)
     client.append_lead.assert_called_once_with(lead, "John wants to book, phone +123", ANY)
     text = update.message.reply_text.call_args.args[0]
     assert "Data saved to spreadsheet" in text

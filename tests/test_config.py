@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from config import Settings
+from config import Settings, load_settings
 
 REQUIRED_ENV = (
     "TELEGRAM_BOT_TOKEN",
@@ -54,3 +54,25 @@ def test_settings_missing_required(monkeypatch):
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+def test_load_settings_reads_environment(monkeypatch, tmp_path):
+    """load_settings явно загружает конфигурацию из окружения."""
+    monkeypatch.chdir(tmp_path)
+    for name in REQUIRED_ENV:
+        monkeypatch.setenv(name, "value")
+
+    loaded = load_settings()
+
+    assert isinstance(loaded, Settings)
+    assert loaded.telegram_bot_token == "value"
+
+
+def test_load_settings_missing_required(monkeypatch, tmp_path):
+    """load_settings валидирует обязательные переменные при запуске."""
+    monkeypatch.chdir(tmp_path)
+    for name in REQUIRED_ENV:
+        monkeypatch.delenv(name, raising=False)
+
+    with pytest.raises(ValidationError):
+        load_settings()

@@ -23,4 +23,6 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+def load_settings() -> Settings:
+    """Explicitly loads and validates settings (call at application startup)."""
+    return Settings()
