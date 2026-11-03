@@ -6,9 +6,9 @@ import signal
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-from config import settings
 import handlers
-from handlers import handle_text, start
+from config import settings
+from handlers import handle_text, handle_unsupported, start
 from sheets import GoogleSheetsClient, SheetsError
 
 logger = logging.getLogger(__name__)
@@ -28,17 +28,34 @@ def build_application() -> Application:
     """Создает и настраивает Application."""
     try:
         client = GoogleSheetsClient()
-    except SheetsError:
-        logger.exception("Sheets unavailable, bot starts without writing")
+    except SheetsError as exc:
+        logger.warning(
+            "Google Sheets unavailable at startup: %s. " "Bot will start without write capability.",
+            exc,
+        )
         client = None
     handlers.sheets_client = client
-    application = (
-        Application.builder().token(settings.telegram_bot_token).build()
-    )
+    application = Application.builder().token(settings.telegram_bot_token).build()
     application.bot_data["sheets_client"] = client
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
+        MessageHandler(
+            filters.PHOTO
+            | filters.AUDIO
+            | filters.VOICE
+            | filters.VIDEO
+            | filters.Document.ALL
+            | filters.Sticker.ALL
+            | filters.ANIMATION
+            | filters.VIDEO_NOTE
+            | filters.CONTACT
+            | filters.LOCATION
+            | filters.VENUE
+            | filters.POLL
+            | filters.Dice.ALL,
+            handle_unsupported,
+        )
     )
     return application
 
@@ -52,10 +69,11 @@ async def main() -> None:
     stop_event = asyncio.Event()
 
     def _shutdown(signum: int, _frame: object) -> None:
-        logger.info("Received signal %s, shutting down...", signum)
+        logger.info("Received shutdown signal %s, shutting down...", signum)
         loop.call_soon_threadsafe(stop_event.set)
 
     for sig in (signal.SIGINT, signal.SIGTERM):
+        # signal.signal accepts signal.Signals at runtime; the stub expects int.
         signal.signal(sig, _shutdown)  # type: ignore[arg-type]
 
     await application.initialize()

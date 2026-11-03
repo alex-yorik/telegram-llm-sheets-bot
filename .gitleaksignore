@@ -1,0 +1,3 @@
+# False positive: generic-api-key matched the `Credentials.from_service_account_file(
+#     self._credentials_path, scopes=_SCOPES)` call in commit 06ba5bd. No secret is present.
+06ba5bd318a373506d1cbfcf20dacdfc956f82b6:sheets.py:generic-api-key:49

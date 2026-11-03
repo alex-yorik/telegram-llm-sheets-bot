@@ -1,152 +1,214 @@
 # Telegram LLM Sheets Bot
 
-## 1. Project Description
+A demonstration Telegram bot that turns free-form text messages into structured
+leads using an LLM, replies with the extracted fields, and appends the result to
+Google Sheets.
 
-Telegram bot that receives free-form text messages, extracts structured lead data (name, phone, service, date, time) using an LLM (OpenAI-compatible API), replies to the user with the extracted fields, and appends the lead as a row in Google Sheets.
+![CI](https://github.com/alex-yorik/telegram-llm-sheets-bot/actions/workflows/ci.yml/badge.svg)
+![Quality Gates](https://github.com/alex-yorik/telegram-llm-sheets-bot/actions/workflows/quality-gates.yml/badge.svg)
 
-## 2. Architecture
+## Status
+
+This is a **demonstration prototype (Level D: Demo / Portfolio)**. It is not a
+production system and is not intended for processing real personal data without
+an additional security and legal review. All example data in this README is
+fictional.
+
+## How this project was built
+
+I am not a professional software developer. This project was built with AI
+coding assistants ("vibe coding"). I define the product idea, requirements and
+acceptance criteria, direct the AI tools, run the results, review behavior, and
+decide what ships. Reviews in this repo are AI-assisted self-reviews, not
+independent third-party audits.
+
+## What the bot does
+
+- Receives text messages through Telegram long polling.
+- Extracts `name`, `phone`, `service`, `date`, and `time` with an
+  OpenAI-compatible LLM API using a strict JSON prompt.
+- Validates the LLM response with a Pydantic model and strips Markdown code
+  fences if the model adds them.
+- Rejects empty extractions and asks the user for more details instead of
+  writing a blank row.
+- Appends each lead to a Google Sheet and creates the header row automatically
+  when the sheet is empty.
+- Deduplicates by `(chat_id, message_id)` to avoid writing the same update
+  twice.
+- Rejects messages longer than 2000 characters.
+- Answers non-text messages with a short explanation.
+- Sends a privacy notice on `/start` because messages are processed by a
+  third-party LLM and extracted data is stored in Google Sheets.
+- Runs as a non-root user inside Docker and shuts down gracefully on
+  `SIGINT` / `SIGTERM`.
+
+## Demo
+
+![Telegram bot dialog](docs/images/telegram-bot-response.png)
+
+A user sends a free-form message and the bot replies with the extracted fields and a save confirmation.
+
+![Google Sheets result](docs/images/google-sheets-result.png)
+
+The same lead is appended as a new row in Google Sheets.
+
+## Architecture
 
 ```text
-Telegram user → Telegram Bot API (polling) → handlers.py
-    → llm.py → LLM API (OpenAI-compatible, e.g. OpenRouter) → Lead model
-    → sheets.py (gspread, sync, via asyncio.to_thread) → Google Sheets
+Telegram user
+    -> Telegram Bot API (long polling)
+    -> handlers.py
+        -> llm.py -> OpenAI-compatible API -> Pydantic Lead
+        -> sheets.py (gspread, called via asyncio.to_thread) -> Google Sheets
 ```
 
-- `python-telegram-bot v20+` polls Telegram with `Application` + `MessageHandler`.
-- `llm.py` sends a system prompt requesting strict JSON (`name/phone/service/date/time`) and validates it into a Pydantic `Lead` model.
-- `sheets.py` (`GoogleSheetsClient`) opens the spreadsheet by ID via a Service Account and appends a row with `value_input_option='RAW'`.
-- Configuration is loaded from environment variables via `pydantic-settings` (`config.py`).
+- `python-telegram-bot` (v20.7) handles polling and message dispatch.
+- `llm.py` sends a system prompt requesting strict JSON and maps provider
+  failures to `LLMRequestError` / `LLMValidationError`.
+- `sheets.py` opens the spreadsheet by ID with a Google Service Account and
+  appends rows with `value_input_option="RAW"` to prevent formula injection.
+- `config.py` loads settings from environment variables with
+  `pydantic-settings`.
 
-## 3. Requirements
+## Requirements
 
-- Docker and Docker Compose (v2, `docker compose` command)
-- Telegram account (to talk to [@BotFather](https://t.me/BotFather) and to test the bot)
-- OpenRouter API key (free tier available) — or any OpenAI-compatible endpoint
-- Google Cloud account (free tier is enough for the Sheets API)
+- Docker and Docker Compose v2 (`docker compose` command)
+- A Telegram account and a bot created via [@BotFather](https://t.me/BotFather)
+- An OpenRouter API key (free tier available) or any OpenAI-compatible endpoint
+- A Google Cloud project with the Google Sheets API enabled
 
-## 4. Deployment Instructions
+## Quick start
 
-### a) Create a Telegram bot via @BotFather
+### 1. Create a Telegram bot
 
-1. Open Telegram and talk to [@BotFather](https://t.me/BotFather).
+1. Open [@BotFather](https://t.me/BotFather) in Telegram.
 2. Send `/newbot`, choose a display name and a username ending in `bot`.
-3. Copy the bot token, e.g. `1234567890:AA...`. You will put it into `.env` as `TELEGRAM_BOT_TOKEN`.
+3. Copy the token. It goes into `.env` as `TELEGRAM_BOT_TOKEN`.
 
-### b) Get an OpenRouter API key
+### 2. Get an LLM API key
 
 1. Sign up at [openrouter.ai](https://openrouter.ai).
-2. Go to [openrouter.ai/keys](https://openrouter.ai/keys) and create a key.
-3. Copy the key (starts with `sk-or-v1-...`). You will use it as `LLM_API_KEY`. Free models (e.g. `...:free`) work without billing.
+2. Create a key at [openrouter.ai/keys](https://openrouter.ai/keys).
+3. Use it as `LLM_API_KEY`. Free models work without billing.
 
-### c) Google Cloud setup
+### 3. Set up Google Sheets
 
-1. **Create a project:** go to [Google Cloud Console](https://console.cloud.google.com/), create a new project (e.g. `telegram-bot-sheets`).
-2. **Enable the Google Sheets API:** in the project, open *APIs & Services → Library*, find *Google Sheets API* and click *Enable*.
-3. **Create a Service Account:** go to *IAM & Admin → Service Accounts → Create Service Account*. Give it a name (e.g. `telegram-bot`), skip optional role grants.
-4. **Download the JSON key:** open the service account → *Keys → Add Key → Create new key → JSON*. Save the file as `service-account.json`.
-5. **Create a Google Spreadsheet:** go to [sheets.google.com](https://sheets.google.com/), create a new spreadsheet. Copy the spreadsheet ID from the URL:
+1. Create a project in the [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable the **Google Sheets API** under *APIs & Services -> Library*.
+3. Create a Service Account under *IAM & Admin -> Service Accounts*.
+4. Open the service account, go to *Keys -> Add Key -> Create new key -> JSON*,
+   and download the key as `service-account.json`.
+5. Create a spreadsheet at [sheets.google.com](https://sheets.google.com/) and
+   copy the spreadsheet ID from its URL:
    `https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit`.
-6. **Share the spreadsheet with the service account as Editor:** in the spreadsheet click *Share*, paste the service account email (e.g. `telegram-bot@YOUR-PROJECT.iam.gserviceaccount.com`), set role to *Editor*, uncheck *Notify people*, click *Share*. Without this step writes fail with permission errors.
+6. Share the spreadsheet with the service account email as **Editor**.
+   Without this step writes fail with permission errors.
 
-### d) Clone the repository
+### 4. Clone the repository
 
 ```bash
-git clone <YOUR_REPO_URL> telegram-llm-sheets-bot
+git clone https://github.com/alex-yorik/telegram-llm-sheets-bot.git
 cd telegram-llm-sheets-bot
 ```
 
-### e) Copy `.env.example` to `.env` and fill in variables
+### 5. Configure environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` (see the Environment variables table below). Example (placeholders only):
+Edit `.env` with your own values:
 
 ```env
-TELEGRAM_BOT_TOKEN=1234567890:YOUR_BOT_TOKEN
-LLM_API_KEY=sk-or-v1-YOUR_KEY
-LLM_API_BASE=https://openrouter.ai/api/v1
-LLM_MODEL=nvidia/nemotron-3.5-lightning:free
+TELEGRAM_BOT_TOKEN=0000000000:YOUR_BOT_TOKEN
+LLM_API_KEY=sk-your-llm-key
+LLM_API_BASE=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
 LLM_TIMEOUT_SECONDS=30
-GOOGLE_SPREADSHEET_ID=YOUR_SPREADSHEET_ID
+GOOGLE_SPREADSHEET_ID=your-spreadsheet-id
 GOOGLE_SHEET_NAME=Sheet1
 GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/service-account.json
 LOG_LEVEL=INFO
 ```
 
-> Note: `GOOGLE_APPLICATION_CREDENTIALS` is the **in-container** path. Keep the default `/app/credentials/service-account.json` — do not put a host path here.
+`GOOGLE_APPLICATION_CREDENTIALS` is the **in-container** path. Keep the default
+`/app/credentials/service-account.json`; do not put a host path here.
 
-### f) Place `service-account.json`
+### 6. Add the service account key
 
-Copy the downloaded Google Service Account key to:
+Place the downloaded key at:
 
 ```text
 ./credentials/service-account.json
 ```
 
-The file is mounted read-only into the container (`./credentials:/app/credentials:ro`). It is gitignored — never commit it.
+The directory is mounted read-only into the container
+(`./credentials:/app/credentials:ro`). The JSON key is gitignored and must never
+be committed.
 
 ```bash
 ls -la credentials/
-# service-account.json  .gitkeep
+# .gitkeep  service-account.json
 ```
 
-### g) Start the bot
+### 7. Start the bot
 
 ```bash
 docker compose up -d --build
 ```
 
-### h) View logs
+### 8. Follow logs and manage the container
 
 ```bash
 docker compose logs -f
 docker compose logs -f --tail=30
+docker compose ps
+docker compose restart
+docker compose down
 ```
 
-Expected startup lines:
-
-```text
-sheets - INFO - GoogleSheetsClient initialized: spreadsheet_id=... sheet=Sheet1
-__main__ - INFO - Bot started (polling).
-```
-
-Useful commands:
+After changing code or the Docker image:
 
 ```bash
-docker compose ps
-docker compose down
 docker compose down && docker compose up -d --build
 ```
 
-## 5. Environment Variables
+Expected startup lines (values depend on your configuration):
+
+```text
+sheets - INFO - GoogleSheetsClient initialized: spreadsheet_id=... sheet=Sheet1 creds=...
+__main__ - INFO - Bot started (polling).
+```
+
+## Environment variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | Yes | — | Bot token from @BotFather. |
-| `LLM_API_KEY` | Yes | — | API key for the LLM provider (e.g. OpenRouter). |
-| `LLM_API_BASE` | No | `https://api.openai.com/v1` | Base URL of the OpenAI-compatible API. For OpenRouter: `https://openrouter.ai/api/v1`. |
-| `LLM_MODEL` | No | `gpt-4o-mini` | Model name, e.g. `gpt-4o-mini` or an OpenRouter model id. |
-| `LLM_TIMEOUT_SECONDS` | No | `30` | Timeout for the LLM request in seconds. |
-| `GOOGLE_SPREADSHEET_ID` | Yes | — | Google Spreadsheet ID (from the sheet URL). |
-| `GOOGLE_SHEET_NAME` | No | `Sheet1` | Worksheet name. If not found, the first sheet is used. |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | — | **In-container** path to the service account JSON. Keep `/app/credentials/service-account.json`. |
+| `TELEGRAM_BOT_TOKEN` | Yes | - | Bot token from @BotFather. |
+| `LLM_API_KEY` | Yes | - | API key for the LLM provider. |
+| `LLM_API_BASE` | No | `https://api.openai.com/v1` | Base URL of the OpenAI-compatible API. For OpenRouter use `https://openrouter.ai/api/v1`. |
+| `LLM_MODEL` | No | `gpt-4o-mini` | Model name or OpenRouter model ID. |
+| `LLM_TIMEOUT_SECONDS` | No | `30` | LLM request timeout in seconds. |
+| `GOOGLE_SPREADSHEET_ID` | Yes | - | Spreadsheet ID from the Google Sheets URL. |
+| `GOOGLE_SHEET_NAME` | No | `Sheet1` | Worksheet name. Falls back to the first sheet if not found. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | - | In-container path to the service account JSON. Keep `/app/credentials/service-account.json`. |
 | `LOG_LEVEL` | No | `INFO` | Python log level (`DEBUG`, `INFO`, `WARNING`, ...). |
 
-## 6. Usage Examples
+## Usage example
 
-**Input message (user → bot):**
+All names, phone numbers, and messages below are fictional demo data.
+
+Input message:
 
 ```text
-Hi, I'm Ivan, phone +1-555-010-2233, I need a haircut tomorrow at 10:00
+Hi, I'm John Smith, phone +1-555-010-2233, I need a haircut tomorrow at 10:00
 ```
 
-**Bot response:**
+Bot response:
 
 ```text
 Extracted data:
-Name: Ivan
+Name: John Smith
 Phone: +1-555-010-2233
 Service: haircut
 Date: tomorrow
@@ -156,53 +218,161 @@ Time: 10:00
 
 Missing fields are shown as `-`.
 
-**Example row in Google Sheets:**
+Example Google Sheets row:
 
 | Name | Phone | Service | Date | Time | Original Message | Created At |
 |---|---|---|---|---|---|---|
-| Ivan | +1-555-010-2233 | haircut | tomorrow | 10:00 | Hi, I'm Ivan, phone +1-555-010-2233, I need a haircut tomorrow at 10:00 | 2026-09-07T06:15:52.448049+00:00 |
+| John Smith | +1-555-010-2233 | haircut | tomorrow | 10:00 | Hi, I'm John Smith, phone +1-555-010-2233, I need a haircut tomorrow at 10:00 | 2026-09-07T06:15:52.448049+00:00 |
 
-The header row is created automatically if the sheet is empty. `None` values are stored as empty strings. Writes use `value_input_option='RAW'` to prevent formula injection. `Created At` is a UTC ISO-8601 timestamp.
+The header row is created automatically when the sheet is empty. Empty values
+are stored as empty strings. Writes use `value_input_option="RAW"` to prevent
+formula injection. `Created At` is a UTC ISO-8601 timestamp.
 
-## 7. Error Handling
+## Error handling
 
 | Situation | What the user sees | What happens internally |
 |---|---|---|
-| LLM returns invalid JSON / validation fails (`LLMValidationError`) | `Could not extract data, please send more details` | Error logged, no sheet write. |
-| LLM network/API/timeout error (`LLMRequestError`) | `Processing error, try again later` | Error logged, no sheet write. |
-| Unexpected error during LLM step | `An error occurred` | `logger.exception`, no sheet write. |
-| Sheets not configured at startup (`SheetsError`) | Bot still starts; user gets extracted data without the `✅` line | `Sheets unavailable, bot starts without writing` logged; `sheets_client` is `None`, write is skipped with a warning. |
-| Sheets write fails at message time (`SheetsError`) | User still gets extracted data, but **without** `✅ Data saved to spreadsheet` | `Failed to save lead to spreadsheet` logged with traceback; exception is swallowed so the bot keeps working. |
+| Message longer than 2000 characters | `Message is too long (max 2000 characters). Please send a shorter message.` | Warning logged with `chat_id` and length; no LLM call, no sheet write. |
+| Duplicate `(chat_id, message_id)` | No reply | Duplicate is skipped and logged. |
+| LLM returns invalid JSON or fails validation | `Could not extract data. Please send a message with more details (name, phone, service, etc.).` | Error logged; no sheet write. |
+| LLM network, API, or timeout error | `Processing error, try again later` | Error logged; no sheet write. |
+| LLM returns an empty lead | `Could not extract meaningful data. Please send a message with more details (name, phone, service, etc.).` | Warning logged; no sheet write. |
+| Unexpected error during extraction | `An error occurred` | Exception logged with traceback; no sheet write. |
+| Sheets unavailable at startup | Extracted data without a save confirmation | Bot still starts; write is skipped with a warning. |
+| Sheets write fails at message time | Extracted data plus `⚠️ Data extracted but could not be saved to spreadsheet. Please try again later.` | Exception logged; the bot keeps running. |
+| Non-text message | `I only process text messages. Please send me a text description.` | No processing. |
 
-The synchronous `gspread` call runs via `asyncio.to_thread()` so polling is never blocked.
+The synchronous `gspread` calls run via `asyncio.to_thread()`, so polling is not
+blocked.
 
-## 8. Project Structure
+## Testing and CI
+
+The test suite uses `pytest`, `pytest-asyncio`, and `pytest-cov`. Latest
+measured result:
+
+```text
+55 passed, 0 skipped
+TOTAL coverage: 99.30%
+```
+
+Coverage by module:
+
+| Module | Coverage |
+|---|---|
+| `config.py` | 100% |
+| `handlers.py` | 100% |
+| `llm.py` | 100% |
+| `main.py` | 96% |
+| `models.py` | 100% |
+| `sheets.py` | 100% |
+
+Run the checks locally:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+python -m pytest --cov=. --cov-report=term-missing
+ruff check .
+ruff format --check .
+bandit -c pyproject.toml -r . -ll -q
+```
+
+CI consists of two GitHub Actions workflows:
+
+- `.github/workflows/ci.yml`: jobs `test`, `lint`, and `docker-build`.
+- `.github/workflows/quality-gates.yml`: jobs `secrets-scan`, `bandit`,
+  `coverage-gate`, and `modularity`.
+
+The coverage gate fails below 80%. The measured suite is at 99.30%.
+
+## Security and privacy notes
+
+See [SECURITY.md](SECURITY.md) for the vulnerability reporting policy and the
+full security notes. Key points:
+
+- Secrets are provided through environment variables. `.env` and
+  `credentials/*.json` are gitignored and excluded from the Docker build context.
+- The service account key is mounted read-only into the container.
+- The container runs as a non-root user (`uid 1000`).
+- Logs record metadata only (`chat_id`, message length, length checks, and
+  outcomes). Message text and extracted personal data are not written to logs.
+- Message content is sent to a third-party LLM provider, and extracted data is
+  stored in Google Sheets. Do not use this bot with real personal data without
+  reviewing provider policies, obtaining user consent, and checking applicable
+  privacy law.
+- Google Sheets writes use `value_input_option="RAW"` to prevent formula
+  injection.
+- Deduplication is in memory and is lost on restart.
+- There is no per-user rate limiting and no GDPR/HIPAA compliance out of the
+  box.
+
+## Known limitations
+
+See [TECH_DEBT.md](TECH_DEBT.md) for the full list with severity and rationale.
+The main limitations are:
+
+- Deduplication uses an in-memory set of `(chat_id, message_id)` and resets when
+  the bot restarts.
+- There is no per-user rate limiting, so a single user can generate unlimited
+  LLM API calls.
+- Google Sheets writes have no retry or queue, so transient API failures can
+  lose a lead.
+- Only a single worksheet is supported; there is no rotation or archival.
+- There is no encryption at rest beyond what Google Sheets provides, and no
+  GDPR/HIPAA tooling.
+
+## Future improvements
+
+If this project evolves beyond a demo, the planned work is:
+
+- Add a persistent store (SQLite or PostgreSQL) for deduplication and leads.
+- Add per-user rate limiting with configurable quotas.
+- Add retry with exponential backoff for LLM and Sheets API calls.
+- Add an application-level liveness probe and a `/health` endpoint.
+- Add metrics and monitoring for LLM calls, sheet writes, and errors.
+- Add a consent flow and data export/deletion endpoints for privacy compliance.
+- Add webhook mode, multi-language support, and admin commands.
+
+## Project structure
 
 ```text
 .
-├── main.py              # Entry point: logging, Application setup, polling loop
-├── handlers.py          # /start and text handlers; LLM → Sheets orchestration
-├── llm.py               # LLM extraction: prompt, OpenAI client, Lead validation
-├── sheets.py            # GoogleSheetsClient, SheetsError, append_lead + header logic
-├── models.py            # Pydantic Lead model (name/phone/service/date/time)
-├── config.py            # pydantic-settings Settings loaded from .env
-├── requirements.txt     # python-telegram-bot, pydantic, openai, gspread, google-auth
-├── Dockerfile           # python:3.12-slim image, runs `python main.py`
-├── docker-compose.yml   # bot service, .env, credentials + data mounts, healthcheck
-├── .env.example         # Template for environment variables (no secrets)
-├── credentials/         # Place service-account.json here (gitignored)
+├── main.py                    # Entry point: logging, Application setup, polling, graceful shutdown
+├── handlers.py                # /start, text and unsupported-message handlers; dedup and limits
+├── llm.py                     # LLM extraction, JSON parsing, Lead validation
+├── sheets.py                  # GoogleSheetsClient, header creation, append_lead
+├── models.py                  # Pydantic Lead model
+├── config.py                  # pydantic-settings configuration
+├── requirements.txt           # Runtime and development dependencies
+├── pyproject.toml             # pytest, coverage, ruff, and bandit configuration
+├── Dockerfile                 # python:3.12-slim, non-root user, `python main.py`
+├── docker-compose.yml         # bot service, env file, read-only credentials mount
+├── .env.example               # Environment variable template (placeholders only)
+├── .dockerignore              # Excludes secrets, tests, docs, and tooling from the image
+├── .gitignore                 # Excludes secrets, local data, and caches
+├── .pre-commit-config.yaml    # ruff and bandit hooks
+├── .gitleaksignore            # One documented false-positive fingerprint
+├── SECURITY.md                # Security policy and limitations
+├── TECH_DEBT.md               # Known limitations and future improvements
+├── LICENSE                    # All rights reserved
+├── credentials/
 │   └── .gitkeep
-└── data/                # Local persistent data mount
+├── docs/
+│   └── reports/
+│       └── phase5-report.md   # AI-assisted engineering report for the tests and CI work
+└── tests/
+    ├── __init__.py
+    ├── conftest.py
+    ├── test_config.py
+    ├── test_handlers.py
+    ├── test_llm.py
+    ├── test_main.py
+    ├── test_models.py
+    └── test_sheets.py
 ```
 
-## 9. License
+## License
 
-MIT License.
-
-Copyright (c) 2026.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+All rights reserved. See [LICENSE](LICENSE) for the full terms.
