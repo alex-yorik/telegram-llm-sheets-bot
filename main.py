@@ -13,12 +13,19 @@ from sheets import GoogleSheetsClient, SheetsError
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
 
 def setup_logging(settings: Settings) -> None:
     """Sets up basic logging."""
+    log_level = settings.log_level.upper()
+    if log_level not in ALLOWED_LOG_LEVELS:
+        raise ValueError(
+            f"Invalid LOG_LEVEL: {settings.log_level}. " f"Allowed values are {', '.join(ALLOWED_LOG_LEVELS)}."
+        )
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        level=getattr(logging, log_level),
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -84,7 +91,8 @@ async def main() -> None:
 
     await application.initialize()
     await application.start()
-    assert application.updater is not None
+    if application.updater is None:
+        raise RuntimeError("Telegram Updater failed to initialize. Check your bot token and network.")
     await application.updater.start_polling()
     logger.info("Bot started (polling).")
 
