@@ -1,7 +1,9 @@
 """Telegram bot command and message handlers."""
 
 import asyncio
+import contextlib
 import logging
+import time
 import uuid
 from collections import deque
 from typing import TYPE_CHECKING
@@ -21,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 MAX_MESSAGE_LENGTH = 2000
 MAX_PROCESSED_MESSAGES = 1000
+RATE_LIMIT_MAX_REQUESTS = 3
+RATE_LIMIT_WINDOW_SECONDS = 60
 
 # Set in main.py at startup (also duplicated in bot_data).
 sheets_client: "GoogleSheetsClient | None" = None
@@ -28,6 +32,32 @@ sheets_client: "GoogleSheetsClient | None" = None
 # Key (chat_id, message_id): message_id is unique only within a chat.
 # deque(maxlen=N) keeps only the last N entries and evicts the oldest automatically.
 processed_messages: deque[tuple[int | None, int]] = deque(maxlen=MAX_PROCESSED_MESSAGES)
+
+# Telegram user_id -> timestamps of accepted requests within the current window.
+request_history: dict[int, deque[float]] = {}
+
+# Serializes the duplicate check and mark so concurrent identical updates cannot
+# both pass the check before the first one is recorded.
+dedup_lock = asyncio.Lock()
+
+
+def _rate_limit_key(update: Update, chat_id: int | None) -> int | None:
+    """Returns the Telegram user_id (falls back to chat_id)."""
+    user = getattr(update, "effective_user", None)
+    user_id = getattr(user, "id", None)
+    return user_id if user_id is not None else chat_id
+
+
+def _is_rate_limited(user_id: int | None) -> bool:
+    """Records a request and returns True if the per-user limit is exceeded."""
+    now = time.monotonic()
+    history = request_history.setdefault(user_id, deque())
+    while history and now - history[0] >= RATE_LIMIT_WINDOW_SECONDS:
+        history.popleft()
+    if len(history) >= RATE_LIMIT_MAX_REQUESTS:
+        return True
+    history.append(now)
+    return False
 
 
 async def handle_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -63,6 +93,12 @@ def _is_duplicate(chat_id: int | None, message_id: int, correlation_id: str) -> 
 def _mark_seen(chat_id: int | None, message_id: int) -> None:
     """Marks a successfully processed message (FIFO eviction)."""
     processed_messages.append((chat_id, message_id))
+
+
+def _unmark_seen(chat_id: int | None, message_id: int) -> None:
+    """Removes the reservation after a failure so the message can be retried."""
+    with contextlib.suppress(ValueError):
+        processed_messages.remove((chat_id, message_id))
 
 
 async def _reject_long_message(update: Update, text: str, correlation_id: str) -> bool:
@@ -161,18 +197,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     text = update.message.text
     message_id = update.message.message_id
     correlation_id = str(uuid.uuid4())
+    user_id = _rate_limit_key(update, chat_id)
 
-    if _is_duplicate(chat_id, message_id, correlation_id):
+    if _is_rate_limited(user_id):
+        await update.message.reply_text("Слишком много запросов, подождите минуту")
+        logger.warning("Rate limit exceeded (correlation_id=%s, user_id=%s)", correlation_id, user_id)
         return
+
     if await _reject_long_message(update, text, correlation_id):
         return
+
+    # Reserve the message under a lock: a concurrent duplicate must see the mark.
+    async with dedup_lock:
+        if _is_duplicate(chat_id, message_id, correlation_id):
+            return
+        _mark_seen(chat_id, message_id)
 
     settings = context.bot_data.get("settings")
     lead = await _extract_or_reply(update, text, correlation_id, settings=settings)
     if lead is None:
+        _unmark_seen(chat_id, message_id)
         return
 
-    # Mark before the Sheets write: a write failure must not trigger a second paid LLM call.
-    _mark_seen(chat_id, message_id)
+    # The mark survives a Sheets failure: it must not trigger a second paid LLM call.
     saved = await _save_lead(lead, text, correlation_id, context)
     await update.message.reply_text(_format_answer(lead, saved))
