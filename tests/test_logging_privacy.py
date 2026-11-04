@@ -195,7 +195,7 @@ def test_append_lead_logs_correlation_id_not_content(caplog):
     caplog.set_level(logging.INFO, logger="sheets")
     client = build_sheets_client()
     worksheet = MagicMock()
-    worksheet.get_all_values.return_value = [HEADER]
+    worksheet.row_values.return_value = HEADER
     client._get_worksheet = MagicMock(return_value=worksheet)
     secret_text = "MY-SECRET-MESSAGE-CONTENT-77"
 
@@ -268,7 +268,7 @@ def test_sheets_save_error_does_not_log_content_or_spreadsheet_id(caplog):
     secret_text = "MY-SECRET-MESSAGE-CONTENT-88"
     client = build_sheets_client()
     worksheet = MagicMock()
-    worksheet.get_all_values.side_effect = RuntimeError(f"write failed for {secret_text} in test-spreadsheet-id")
+    worksheet.row_values.side_effect = RuntimeError(f"write failed for {secret_text} in test-spreadsheet-id")
     client._get_worksheet = MagicMock(return_value=worksheet)
 
     with pytest.raises(SheetsError):

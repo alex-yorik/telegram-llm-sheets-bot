@@ -13,6 +13,10 @@ from models import Lead
 
 logger = logging.getLogger(__name__)
 
+# Reused across requests to avoid creating a new client (and connection pool) per call.
+_client: AsyncOpenAI | None = None
+_client_signature: tuple[str, str, int] | None = None
+
 SYSTEM_PROMPT = (
     "Ты извлекаешь данные заявки из текста пользователя. "
     "Верни ТОЛЬКО валидный JSON без пояснений и без markdown-обёртки. "
@@ -29,6 +33,21 @@ class LLMRequestError(Exception):
 
 class LLMValidationError(Exception):
     """The LLM returned data that could not be parsed/validated."""
+
+
+def _get_client(settings: Settings) -> AsyncOpenAI:
+    """Returns the shared AsyncOpenAI client, creating it once per configuration."""
+    global _client, _client_signature
+    signature = (settings.llm_api_key, settings.llm_api_base, settings.llm_timeout_seconds)
+    if _client is None or _client_signature != signature:
+        _client = AsyncOpenAI(
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_api_base,
+            timeout=settings.llm_timeout_seconds,
+        )
+        _client_signature = signature
+        logger.info("OpenAI client initialized (base_url=%s)", settings.llm_api_base)
+    return _client
 
 
 def _strip_code_fences(content: str) -> str:
@@ -74,11 +93,7 @@ async def extract_lead(
         settings.llm_model,
         len(text),
     )
-    client = AsyncOpenAI(
-        api_key=settings.llm_api_key,
-        base_url=settings.llm_api_base,
-        timeout=settings.llm_timeout_seconds,
-    )
+    client = _get_client(settings)
     try:
         response = await client.chat.completions.create(
             model=settings.llm_model,

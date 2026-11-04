@@ -172,7 +172,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if lead is None:
         return
 
+    # Mark before the Sheets write: a write failure must not trigger a second paid LLM call.
+    _mark_seen(chat_id, message_id)
     saved = await _save_lead(lead, text, correlation_id, context)
-    if saved:
-        _mark_seen(chat_id, message_id)
     await update.message.reply_text(_format_answer(lead, saved))
