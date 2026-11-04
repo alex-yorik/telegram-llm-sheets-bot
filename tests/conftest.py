@@ -1,5 +1,7 @@
 """Общая настройка тестов: изолированные настройки без глобального окружения."""
 
+import asyncio
+
 import pytest
 
 from config import Settings
@@ -40,7 +42,11 @@ def reset_handler_state():
     import handlers
 
     handlers.processed_messages.clear()
+    handlers.request_history.clear()
+    handlers.dedup_lock = asyncio.Lock()
     handlers.sheets_client = None
     yield
     handlers.processed_messages.clear()
+    handlers.request_history.clear()
+    handlers.dedup_lock = asyncio.Lock()
     handlers.sheets_client = None
