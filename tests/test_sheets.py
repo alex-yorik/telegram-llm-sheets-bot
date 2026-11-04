@@ -100,7 +100,7 @@ def test_append_lead_success():
     """Строка заявки добавляется с RAW-вводом."""
     client = build_client()
     worksheet = MagicMock()
-    worksheet.get_all_values.return_value = [HEADER]
+    worksheet.row_values.return_value = HEADER
     client._get_worksheet = MagicMock(return_value=worksheet)
     lead = Lead(
         name="John",
@@ -125,7 +125,7 @@ def test_append_lead_creates_header_if_empty():
     """В пустую таблицу сначала пишется заголовок."""
     client = build_client()
     worksheet = MagicMock()
-    worksheet.get_all_values.return_value = []
+    worksheet.row_values.return_value = []
     client._get_worksheet = MagicMock(return_value=worksheet)
 
     client.append_lead(Lead(name="John"), "", correlation_id=None)
@@ -139,7 +139,7 @@ def test_append_lead_clears_whitespace_only_sheet():
     """Таблица из пустых ячеек очищается перед заголовком."""
     client = build_client()
     worksheet = MagicMock()
-    worksheet.get_all_values.return_value = [["   ", ""]]
+    worksheet.row_values.return_value = ["   ", ""]
     client._get_worksheet = MagicMock(return_value=worksheet)
 
     client.append_lead(Lead(name="John"), "", correlation_id=None)
@@ -152,7 +152,7 @@ def test_append_lead_sheets_error():
     """Ошибка записи превращается в SheetsError."""
     client = build_client()
     worksheet = MagicMock()
-    worksheet.get_all_values.side_effect = RuntimeError("Sheets Error")
+    worksheet.row_values.side_effect = RuntimeError("Sheets Error")
     client._get_worksheet = MagicMock(return_value=worksheet)
 
     with pytest.raises(SheetsError):

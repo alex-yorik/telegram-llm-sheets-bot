@@ -23,6 +23,18 @@ def test_settings() -> Settings:
 
 
 @pytest.fixture(autouse=True)
+def reset_llm_client():
+    """Isolates the shared OpenAI client between tests."""
+    import llm
+
+    llm._client = None
+    llm._client_signature = None
+    yield
+    llm._client = None
+    llm._client_signature = None
+
+
+@pytest.fixture(autouse=True)
 def reset_handler_state():
     """Изолирует глобальное состояние обработчиков между тестами."""
     import handlers

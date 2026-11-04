@@ -74,10 +74,10 @@ class GoogleSheetsClient:
         """Appends a row with lead data to the spreadsheet."""
         try:
             worksheet = self._get_worksheet()
-            values = worksheet.get_all_values()
-            is_empty = not values or all(not any(cell.strip() for cell in row) for row in values)
+            first_row = worksheet.row_values(1)
+            is_empty = not first_row or all(not cell.strip() for cell in first_row)
             if is_empty:
-                if values:
+                if first_row:
                     worksheet.clear()
                 worksheet.append_row(HEADER, value_input_option="RAW")
                 logger.info("Header row added: %s", HEADER)

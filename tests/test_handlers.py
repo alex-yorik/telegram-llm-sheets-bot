@@ -310,8 +310,8 @@ async def test_handle_text_retry_after_llm_error():
 
 
 @pytest.mark.asyncio
-async def test_handle_text_retry_after_sheets_error():
-    """После временной ошибки Sheets повторная попытка возможна."""
+async def test_handle_text_no_retry_after_sheets_error():
+    """Ошибка Sheets не приводит к повторному списанию токенов LLM."""
     client = MagicMock()
     client.append_lead.side_effect = [SheetsError("Sheets Error"), None]
     context = make_context(client)
@@ -322,8 +322,8 @@ async def test_handle_text_retry_after_sheets_error():
         await handle_text(make_update(message_id=43), context)
         await handle_text(make_update(message_id=43), context)
 
-    assert mock_extract.await_count == 2
-    assert client.append_lead.call_count == 2
+    mock_extract.assert_awaited_once()
+    assert client.append_lead.call_count == 1
 
 
 @pytest.mark.asyncio
