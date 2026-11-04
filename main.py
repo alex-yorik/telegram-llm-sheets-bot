@@ -21,8 +21,7 @@ def setup_logging(settings: Settings) -> None:
     log_level = settings.log_level.upper()
     if log_level not in ALLOWED_LOG_LEVELS:
         raise ValueError(
-            f"Invalid LOG_LEVEL: {settings.log_level}. "
-            f"Allowed values are {', '.join(ALLOWED_LOG_LEVELS)}."
+            f"Invalid LOG_LEVEL: {settings.log_level}. " f"Allowed values are {', '.join(ALLOWED_LOG_LEVELS)}."
         )
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -93,9 +92,7 @@ async def main() -> None:
     await application.initialize()
     await application.start()
     if application.updater is None:
-        raise RuntimeError(
-            "Telegram Updater failed to initialize. Check your bot token and network."
-        )
+        raise RuntimeError("Telegram Updater failed to initialize. Check your bot token and network.")
     await application.updater.start_polling()
     logger.info("Bot started (polling).")
 
