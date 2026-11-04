@@ -1,5 +1,6 @@
 """Тесты сборки и запуска приложения."""
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,6 +36,25 @@ def test_setup_logging(test_settings):
 
     basic_config.assert_called_once()
     assert get_logger.call_count == 2
+
+
+def test_setup_logging_applies_valid_level(test_settings):
+    """Допустимый LOG_LEVEL передается в logging без отката."""
+    debug_settings = test_settings.model_copy(update={"log_level": "debug"})
+    with (
+        patch("main.logging.basicConfig") as basic_config,
+        patch("main.logging.getLogger"),
+    ):
+        main.setup_logging(debug_settings)
+
+    assert basic_config.call_args.kwargs["level"] == logging.DEBUG
+
+
+def test_setup_logging_rejects_invalid_level(test_settings):
+    """Неверный LOG_LEVEL останавливает запуск с ValueError."""
+    invalid_settings = test_settings.model_copy(update={"log_level": "TRACE"})
+    with pytest.raises(ValueError, match="Invalid LOG_LEVEL: TRACE"):
+        main.setup_logging(invalid_settings)
 
 
 def test_build_application_registers_handlers(test_settings):
@@ -114,3 +134,26 @@ async def test_main_starts_and_stops(test_settings):
     shutdown_handler = signal_mock.call_args_list[0].args[1]
     shutdown_handler(2, None)
     loop.call_soon_threadsafe.assert_called_once_with(stop_event.set)
+
+
+@pytest.mark.asyncio
+async def test_main_raises_when_updater_missing(test_settings):
+    """Отсутствие Updater приводит к явной RuntimeError вместо assert."""
+    application = MagicMock()
+    application.initialize = AsyncMock()
+    application.start = AsyncMock()
+    application.updater = None
+    loop = MagicMock()
+    stop_event = MagicMock()
+    stop_event.wait = AsyncMock()
+
+    with (
+        patch("main.load_settings", return_value=test_settings),
+        patch("main.setup_logging"),
+        patch("main.build_application", return_value=application),
+        patch("main.asyncio.get_running_loop", return_value=loop),
+        patch("main.asyncio.Event", return_value=stop_event),
+        patch("main.signal.signal"),
+        pytest.raises(RuntimeError, match="Telegram Updater failed to initialize"),
+    ):
+        await main.main()
