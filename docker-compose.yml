@@ -8,6 +8,13 @@ services:
     volumes:
       - ./credentials:/app/credentials:ro
       - ./data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
     # No healthcheck: checking that a process exists does not prove the bot
     # works (polling + LLM + Sheets). A real check needs an app-level probe,
     # so `restart: unless-stopped` handles crashes instead of a false "healthy".
